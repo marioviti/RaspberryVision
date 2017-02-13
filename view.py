@@ -54,7 +54,7 @@ class View(threading.Thread):
 
             # caputure image from camera
             #self.camera.capture(self.stream,format='bgr',use_video_port=True)
-            self.camera.capture_sequence(streams_generator(),use_video_port=True)
+            self.camera.capture_sequence(self.streams_generator(),use_video_port=True)
 
             data = np.fromstring(self.stream[0].getvalue(),dtype=np.uint8)
             self.previous_image = cv2.imdecode(data,1)
