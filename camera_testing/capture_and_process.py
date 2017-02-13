@@ -5,6 +5,9 @@ import picamera
 import numpy as np
 import cv2
 
+
+QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_X11InitThreads)
+
 # Create a pool of image processors
 done = False
 lock = None
@@ -79,7 +82,7 @@ def streams():
 with picamera.PiCamera() as camera:
     global lock
     lock = threading.Lock()
-    pool = [ImageProcessor() for i in range(3)]
+    pool = [ImageProcessor() for i in range(1)]
     camera.resolution = (640, 480)
     camera.framerate = 10
     #camera.start_preview()
