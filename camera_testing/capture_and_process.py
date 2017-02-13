@@ -44,7 +44,7 @@ class ImageProcessor(threading.Thread):
 
                     with image_lock: ## is not thread safe!!!!!
                         cv2.imshow('image',edges)
-                        key = cv2.waitKey(25) & 0xFF
+                        key = cv2.waitKey(10) & 0xFF
                         if k == 27 or key == ord("q"):
                             done = True
                     # Set done to True if you want the script to terminate
