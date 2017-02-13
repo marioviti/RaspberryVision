@@ -44,7 +44,7 @@ class ImageProcessor(threading.Thread):
 
                     with image_lock: ## is not thread safe!!!!!
                         cv2.imshow('image',edges)
-                        key = cv2.waitKey(1) & 0xFF
+                        key = cv2.waitKey(25) & 0xFF
                         if k == 27 or key == ord("q"):
                             done = True
                     # Set done to True if you want the script to terminate
@@ -91,7 +91,7 @@ with picamera.PiCamera() as camera:
     image_lock = threading.Lock()
     pool = [ImageProcessor() for i in range(4)]
     camera.resolution = (640, 480)
-    camera.framerate = 30
+    camera.framerate = 10
     #camera.start_preview()
     time.sleep(2)
     camera.capture_sequence(streams(), use_video_port=True)
