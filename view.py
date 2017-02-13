@@ -36,7 +36,8 @@ class View(threading.Thread):
         self.camera = initialize_camera()
 
         # data structures for images
-        self.stream = PiRGBArray(self.camera)
+        #self.stream = PiRGBArray(self.camera)
+        self.stream = io.BytesIO()
         self.current_image = None
         self.previous_image = None
 
@@ -48,11 +49,14 @@ class View(threading.Thread):
             start = time.time()
 
             # caputure image from camera
-            self.camera.capture(self.stream,format='bgr',use_video_port=False)
+            #self.camera.capture(self.stream,format='bgr',use_video_port=True)
+            self.camera.capture_sequence(stream,use_video_port=True)
+            data = np.fromstring(stream.getvalue(),dtype=np.uint8)
+            #turn the array into a cv2 image
 
             # turn the stream to array
-            self.current_image = self.stream.array
-
+            #self.current_image = self.stream.array
+            self.current_image = cv2.imdecode(data,1)
             end = time.time()
             delta = (end - start)
             print "capturing time: %f secs" % delta
