@@ -38,7 +38,7 @@ class View(threading.Thread):
         # need stabilization.
         time.sleep(2)
         print "Initialized camera"
-        camera.resolution = resolution
+        camera.resolution = (640, 480)
         camera.framerate = framerate
         return camera
 
