@@ -40,9 +40,9 @@ class ImageProcessor(threading.Thread):
                     # Set done to True if you want the script to terminate
                     # at some point
                     # print self.image.shape
-                    key = cv2.waitKey(0) & 0xFF
-                    if key == ord('q'):
-                        done=True
+                    #key = cv2.waitKey(0) & 0xFF
+                    #if key == ord('q'):
+                    #    done=True
                 finally:
                     # Reset the stream and event
                     self.stream.seek(0)
@@ -50,12 +50,14 @@ class ImageProcessor(threading.Thread):
                     self.event.clear()
                     # Return ourselves to the pool
                     with lock:
+                        print 'thread %d back on the pool' % self.id
                         pool.append(self)
 
 def streams():
     global done
     global pool
     global lock
+    processor = None
     while not done:
         with lock:
             if pool:
@@ -66,7 +68,7 @@ def streams():
             yield processor.stream
             processor.event.set()
         else:
-            print 'streams'
+            print 'waiting for threads'
             # When the pool is starved, wait a while for it to refill
             time.sleep(0.1)
 
