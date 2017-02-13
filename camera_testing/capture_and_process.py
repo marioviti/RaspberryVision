@@ -82,7 +82,7 @@ with picamera.PiCamera() as camera:
     pool = [ImageProcessor() for i in range(3)]
     camera.resolution = (640, 480)
     camera.framerate = 10
-    camera.start_preview()
+    #camera.start_preview()
     time.sleep(2)
     camera.capture_sequence(streams(), use_video_port=True)
 
