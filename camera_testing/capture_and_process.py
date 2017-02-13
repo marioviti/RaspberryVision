@@ -2,6 +2,8 @@ import io
 import time
 import threading
 import picamera
+import numpy as np
+import cv2
 
 # Create a pool of image processors
 done = False
@@ -14,6 +16,7 @@ class ImageProcessor(threading.Thread):
         self.stream = io.BytesIO()
         self.event = threading.Event()
         self.terminated = False
+        self.image = None
         self.start()
 
     def run(self):
@@ -24,10 +27,13 @@ class ImageProcessor(threading.Thread):
             if self.event.wait(1):
                 try:
                     self.stream.seek(0)
-                    i1 = self.stream.array
-                    cv2.imshow("show",i1)
+                    # Read the image and do some processing on it
+                    self.image = np.fromstring(self.stream.getvalue(), dtype=np.uint8)
+                    # Set done to True if you want the script to terminate
+                    # at some point
+                    print self.image.shape
                     key = cv2.waitKey(0) & 0xFF
-                    if key == ord('q'):
+                    if key == ord('q')
                         done=True
                 finally:
                     # Reset the stream and event
@@ -58,7 +64,7 @@ with picamera.PiCamera() as camera:
     camera.framerate = 30
     camera.start_preview()
     time.sleep(2)
-    camera.capture_sequence(streams(), format='bgr', use_video_port=True)
+    camera.capture_sequence(streams(), format="bgr", use_video_port=True)
 
 # Shut down the processors in an orderly fashion
 while pool:
