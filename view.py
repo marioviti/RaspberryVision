@@ -31,7 +31,7 @@ class View(threading.Thread):
 
         self.start()
 
-    def initialize_camera(resolution=(400,400),framerate=10):
+    def initialize_camera(resolution=(640, 480),framerate=10):
         camera = PiCamera()
         # let camera warm up!!!!!!!!!!!!!!
         # this is extremely important, readings from sensor
