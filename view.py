@@ -11,6 +11,16 @@ def processing(image):
     edges = cv2.Canny(image,100,200)
     return
 
+def initialize_camera(res=(640, 480),fr=10):
+    camera = PiCamera()
+    # let camera warm up!!!!!!!!!!!!!!
+    # this is extremely important, readings from sensor
+    # need stabilization.
+    time.sleep(2)
+    camera.resolution = res
+    camera.framerate = fr
+    return camera
+
 class View(threading.Thread):
     def __init__(self):
 
@@ -23,7 +33,7 @@ class View(threading.Thread):
         self.terminated = False
 
         # camera object
-        self.camera = self.initialize_camera()
+        self.camera = initialize_camera()
 
         # data structures for images
         self.stream = PiRGBArray(self.camera)
@@ -31,17 +41,6 @@ class View(threading.Thread):
         self.previous_image = None
 
         self.start()
-
-    def initialize_camera(res=(640, 480),fr=10):
-        camera = PiCamera()
-        # let camera warm up!!!!!!!!!!!!!!
-        # this is extremely important, readings from sensor
-        # need stabilization.
-        time.sleep(2)
-        print "Initialized camera"
-        camera.resolution = res
-        camera.framerate = fr
-        return camera
 
     def run(self):
         print "running"
