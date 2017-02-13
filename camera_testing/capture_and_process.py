@@ -36,7 +36,9 @@ class ImageProcessor(threading.Thread):
                 try:
                     self.stream.seek(0)
                     # Read the image and do some processing on it
-                    # self.image = np.fromstring(self.stream.getvalue(), dtype=np.uint8)
+                    data = np.fromstring(self.stream.getvalue(), dtype=np.uint8)
+                    self.image = cv2.imdecode(data, 1)
+                    cv2.imshow('image',self.image)
                     # Set done to True if you want the script to terminate
                     # at some point
                     # print self.image.shape
@@ -52,6 +54,8 @@ class ImageProcessor(threading.Thread):
                     with lock:
                         print 'thread %d back on the pool' % self.id
                         pool.append(self)
+        if self.terminated:
+            cv2.destroyAllWindows()
 
 def streams():
     global done
@@ -75,7 +79,7 @@ def streams():
 with picamera.PiCamera() as camera:
     global lock
     lock = threading.Lock()
-    pool = [ImageProcessor() for i in range(1)]
+    pool = [ImageProcessor() for i in range(3)]
     camera.resolution = (640, 480)
     camera.framerate = 10
     camera.start_preview()
