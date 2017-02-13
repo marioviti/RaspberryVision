@@ -23,11 +23,6 @@ def initialize_camera(res=(640, 480),fr=30):
 
 class View(threading.Thread):
     def __init__(self, buffering_size=3):
-    """
-        framerate is 30 fps, so by taking 3 images at the time
-        we have therefore a limit of 10 hz processing frequency
-        for serving our caller!!!!
-    """
         print "View starting"
 
         # initialize the state
