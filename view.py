@@ -78,7 +78,6 @@ class View(threading.Thread):
             # do processing
             for image in self.images:
                 processing(image)
-                processing(self.current_image)
 
             # save previous image
 
