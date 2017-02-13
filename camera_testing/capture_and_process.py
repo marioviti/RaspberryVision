@@ -26,8 +26,8 @@ class ImageProcessor(threading.Thread):
                     self.stream.seek(0)
                     i1 = stream.array
                     cv2.imshow("show",i1)
-			        key = cv2.waitKey(0) & 0xFF
-			        if key == ord('q'):
+                    key = cv2.waitKey(0) & 0xFF
+                    if key == ord('q'):
                         done=True
                 finally:
                     # Reset the stream and event
