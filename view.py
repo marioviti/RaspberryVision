@@ -7,11 +7,18 @@ from picamera.array import PiRGBArray
 import numpy as np
 import cv2
 
+shutdown = False
+
 def processing(image):
-    edges = cv2.Canny(image,100,200)
+    global shutdown
+    ##edges = cv2.Canny(image,100,200)
+    cv2.imshow("image",image)
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord('q'):
+        shutdown = True
     return
 
-def initialize_camera(res=(640, 480),fr=30):
+def initialize_camera(res=(400, 400),fr=30):
     camera = PiCamera()
     # let camera warm up!!!!!!!!!!!!!!
     # this is extremely important, readings from sensor
@@ -57,7 +64,7 @@ class View(threading.Thread):
 
     def run(self):
         print "running"
-        while(not self.terminated):
+        while(not self.terminated and not shutdown):
             start = time.time()
 
             # caputure image from camera
@@ -89,5 +96,9 @@ class View(threading.Thread):
             end = time.time()
             delta = (end - start)
             print "processing time: %f secs" % delta
+
+        print "exiting"
+        for stream in self.streams:
+            stream.close()
 
 View()
