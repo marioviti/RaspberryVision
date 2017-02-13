@@ -5,14 +5,12 @@ import picamera
 import numpy as np
 import cv2
 
-
-QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_X11InitThreads)
-
 # Create a pool of image processors
 done = False
 lock = None
 pool = []
 idx = 0
+image_lock =
 
 class ImageProcessor(threading.Thread):
     def __init__(self):
@@ -41,7 +39,8 @@ class ImageProcessor(threading.Thread):
                     # Read the image and do some processing on it
                     data = np.fromstring(self.stream.getvalue(), dtype=np.uint8)
                     self.image = cv2.imdecode(data, 1)
-                    cv2.imshow('image',self.image)
+                    with image_lock: ## is not thread safe!!!!!
+                        cv2.imshow('image',self.image)
                     # Set done to True if you want the script to terminate
                     # at some point
                     # print self.image.shape
@@ -82,7 +81,8 @@ def streams():
 with picamera.PiCamera() as camera:
     global lock
     lock = threading.Lock()
-    pool = [ImageProcessor() for i in range(1)]
+    image_lock = threading.Lock()
+    pool = [ImageProcessor() for i in range(2)]
     camera.resolution = (640, 480)
     camera.framerate = 10
     #camera.start_preview()
