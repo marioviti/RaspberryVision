@@ -11,10 +11,10 @@ rawCapture = PiRGBArray(camera, size=(640, 480))
 time.sleep(2)
 #camera.start_preview()
 for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
-	image = frame.array
+    image = frame.array
     cv2.imshow("image",image)
-	rawCapture.truncate(0)
-	# if the `q` key was pressed, break from the loop
+    rawCapture.truncate(0)
+    # if the `q` key was pressed, break from the loop
     key = cv2.waitKey(0) & 0xFF
     if key == ord("q"):
         break
