@@ -7,16 +7,20 @@ import cv2
 
 # Create a pool of image processors
 done = False
-lock = threading.Lock()
+lock = None
 pool = []
+idx = 0
 
 class ImageProcessor(threading.Thread):
     def __init__(self):
+        global idx
         super(ImageProcessor, self).__init__()
         self.stream = io.BytesIO()
         self.event = threading.Event()
         self.terminated = False
         self.image = None
+        self.id = idx
+        idx += 1
         self.start()
 
     def run(self):
@@ -26,14 +30,16 @@ class ImageProcessor(threading.Thread):
         global lock
         while not self.terminated:
             # Wait for an image to be written to the stream
+            print 'thread %d waiting' % self.id
             if self.event.wait(1):
+                print 'thread %d event signalled' % self.id
                 try:
                     self.stream.seek(0)
                     # Read the image and do some processing on it
-                    self.image = np.fromstring(self.stream.getvalue(), dtype=np.uint8)
+                    # self.image = np.fromstring(self.stream.getvalue(), dtype=np.uint8)
                     # Set done to True if you want the script to terminate
                     # at some point
-                    print self.image.shape
+                    # print self.image.shape
                     key = cv2.waitKey(0) & 0xFF
                     if key == ord('q'):
                         done=True
@@ -60,16 +66,19 @@ def streams():
             yield processor.stream
             processor.event.set()
         else:
+            print 'streams'
             # When the pool is starved, wait a while for it to refill
             time.sleep(0.1)
 
 with picamera.PiCamera() as camera:
+    global lock
+    lock = threading.Lock()
     pool = [ImageProcessor() for i in range(4)]
     camera.resolution = (640, 480)
-    camera.framerate = 30
+    camera.framerate = 10
     camera.start_preview()
     time.sleep(2)
-    camera.capture_sequence(streams(), format="bgr", use_video_port=True)
+    camera.capture_sequence(streams(), use_video_port=True)
 
 # Shut down the processors in an orderly fashion
 while pool:
