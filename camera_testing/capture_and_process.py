@@ -40,13 +40,13 @@ class ImageProcessor(threading.Thread):
                     # Read the image and do some processing on it
                     data = np.fromstring(self.stream.getvalue(), dtype=np.uint8)
                     self.image = cv2.imdecode(data, 1)
-                    edges = cv2.Canny(self.image,100,200)
+                    #edges = cv2.Canny(self.image,100,200)
                     #
-                    #with image_lock: ## is not thread safe!!!!!
-                    #    cv2.imshow('image',edges)
-                    #    key = cv2.waitKey(10) & 0xFF
-                    #    if k == 27 or key == ord("q"):
-                    #        done = True
+                    with image_lock: ## is not thread safe!!!!!
+                        cv2.imshow('image',self.image)
+                        key = cv2.waitKey(100) & 0xFF
+                        if k == 27 or key == ord("q"):
+                            done = True
                     # Set done to True if you want the script to terminate
                     # at some point
                     # print self.image.shape
