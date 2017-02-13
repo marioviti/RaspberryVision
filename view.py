@@ -37,11 +37,15 @@ class View(threading.Thread):
 
         # data structures for images
         #self.stream = PiRGBArray(self.camera)
-        self.stream = io.BytesIO()
+        self.streams = [ io.BytesIO(), io.BytesIO() ]
         self.current_image = None
         self.previous_image = None
 
         self.start()
+
+    def streams_generator():
+        for stream in self.streams:
+            yield stream
 
     def run(self):
         print "running"
@@ -50,27 +54,33 @@ class View(threading.Thread):
 
             # caputure image from camera
             #self.camera.capture(self.stream,format='bgr',use_video_port=True)
-            self.camera.capture_sequence(stream,use_video_port=True)
-            data = np.fromstring(stream.getvalue(),dtype=np.uint8)
-            #turn the array into a cv2 image
+            self.camera.capture_sequence(streams_generator(),use_video_port=True)
 
+            data = np.fromstring(self.stream[0].getvalue(),dtype=np.uint8)
+            self.previous_image = cv2.imdecode(data,1)
+
+            data = np.fromstring(self.stream[1].getvalue(),dtype=np.uint8)
+            self.current_image = cv2.imdecode(data,1)
             # turn the stream to array
             #self.current_image = self.stream.array
-            self.current_image = cv2.imdecode(data,1)
             end = time.time()
             delta = (end - start)
             print "capturing time: %f secs" % delta
 
             start = time.time()
             # do processing
+            processing(self.previous_image)
             processing(self.current_image)
 
             # save previous image
             self.previous_image = self.current_image
 
             # reinitialize the stream
-            self.stream.seek(0)
-            self.stream.truncate()
+            self.stream[0].seek(0)
+            self.stream[0].truncate()
+
+            self.stream[1].seek(0)
+            self.stream[1].truncate()
 
             end = time.time()
             delta = (end - start)
