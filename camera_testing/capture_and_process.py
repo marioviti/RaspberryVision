@@ -22,6 +22,8 @@ class ImageProcessor(threading.Thread):
     def run(self):
         # This method runs in a separate thread
         global done
+        global pool
+        global lock
         while not self.terminated:
             # Wait for an image to be written to the stream
             if self.event.wait(1):
@@ -33,7 +35,7 @@ class ImageProcessor(threading.Thread):
                     # at some point
                     print self.image.shape
                     key = cv2.waitKey(0) & 0xFF
-                    if key == ord('q')
+                    if key == ord('q'):
                         done=True
                 finally:
                     # Reset the stream and event
@@ -45,6 +47,9 @@ class ImageProcessor(threading.Thread):
                         pool.append(self)
 
 def streams():
+    global done
+    global pool
+    global lock
     while not done:
         with lock:
             if pool:
@@ -68,6 +73,9 @@ with picamera.PiCamera() as camera:
 
 # Shut down the processors in an orderly fashion
 while pool:
+    global done
+    global pool
+    global lock
     with lock:
         processor = pool.pop()
     processor.terminated = True
