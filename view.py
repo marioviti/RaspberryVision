@@ -51,7 +51,7 @@ class View(threading.Thread):
             self.camera.capture(self.stream,format='bgr',use_video_port=True)
 
             # turn the stream to array
-            self.current_image = stream.array
+            self.current_image = self.stream.array
 
             # do processing
             processing(self.current_image)
