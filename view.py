@@ -43,7 +43,7 @@ class View(threading.Thread):
 
         self.start()
 
-    def streams_generator():
+    def streams_generator(self):
         for stream in self.streams:
             yield stream
 
