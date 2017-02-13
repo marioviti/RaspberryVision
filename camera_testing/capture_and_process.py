@@ -24,7 +24,7 @@ class ImageProcessor(threading.Thread):
             if self.event.wait(1):
                 try:
                     self.stream.seek(0)
-                    i1 = stream.array
+                    i1 = self.stream.array
                     cv2.imshow("show",i1)
                     key = cv2.waitKey(0) & 0xFF
                     if key == ord('q'):
