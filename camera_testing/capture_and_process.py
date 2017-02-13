@@ -88,9 +88,9 @@ with picamera.PiCamera() as camera:
     global image_lock
     lock = threading.Lock()
     image_lock = threading.Lock()
-    pool = [ImageProcessor() for i in range(3)]
+    pool = [ImageProcessor() for i in range(4)]
     camera.resolution = (640, 480)
-    camera.framerate = 10
+    camera.framerate = 30
     #camera.start_preview()
     time.sleep(2)
     camera.capture_sequence(streams(), use_video_port=True)
