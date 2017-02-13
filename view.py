@@ -64,6 +64,7 @@ class View(threading.Thread):
             self.stream.truncate()
 
             end = time.time()
-            print "processing time: %f secs" % end - start
+            delta = (end - start)
+            print "processing time: %f secs" % delta
 
 View()
