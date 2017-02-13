@@ -10,7 +10,7 @@ done = False
 lock = None
 pool = []
 idx = 0
-image_lock =
+image_lock = None
 
 class ImageProcessor(threading.Thread):
     def __init__(self):
@@ -29,6 +29,7 @@ class ImageProcessor(threading.Thread):
         global done
         global pool
         global lock
+        global image_lock
         while not self.terminated:
             # Wait for an image to be written to the stream
             print 'thread %d waiting' % self.id
@@ -80,6 +81,7 @@ def streams():
 
 with picamera.PiCamera() as camera:
     global lock
+    global image_lock
     lock = threading.Lock()
     image_lock = threading.Lock()
     pool = [ImageProcessor() for i in range(2)]
