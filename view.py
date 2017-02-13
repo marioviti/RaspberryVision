@@ -11,7 +11,7 @@ def processing(image):
     edges = cv2.Canny(image,100,200)
     return
 
-def initialize_camera(res=(640, 480),fr=10):
+def initialize_camera(res=(640, 480),fr=30):
     camera = PiCamera()
     # let camera warm up!!!!!!!!!!!!!!
     # this is extremely important, readings from sensor
@@ -48,7 +48,7 @@ class View(threading.Thread):
             start = time.time()
 
             # caputure image from camera
-            self.camera.capture(self.stream,format='bgr',use_video_port=True)
+            self.camera.capture(self.stream,format='bgr',use_video_port=False)
 
             # turn the stream to array
             self.current_image = self.stream.array
