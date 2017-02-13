@@ -3,6 +3,7 @@ import time
 import threading
 import picamera
 from picamera import PiCamera
+from picamera.array import PiRGBArray
 import numpy as np
 import cv2
 
@@ -21,25 +22,25 @@ class View(threading.Thread):
         self.called = threading.Event()
         self.terminated = False
 
-        # data structures for images
-        self.stream = io.BytesIO()
-        self.current_image = None
-        self.previous_image = None
-
         # camera object
         self.camera = self.initialize_camera()
 
+        # data structures for images
+        self.stream = PiRGBArray(self.camera)
+        self.current_image = None
+        self.previous_image = None
+
         self.start()
 
-    def initialize_camera(resolution=(640, 480),framerate=10):
+    def initialize_camera(res=(640, 480),fr=10):
         camera = PiCamera()
         # let camera warm up!!!!!!!!!!!!!!
         # this is extremely important, readings from sensor
         # need stabilization.
         time.sleep(2)
         print "Initialized camera"
-        camera.resolution = (640, 480)
-        camera.framerate = framerate
+        camera.resolution = res
+        camera.framerate = fr
         return camera
 
     def run(self):
@@ -48,10 +49,10 @@ class View(threading.Thread):
             start = time.time()
 
             # caputure image from camera
-            self.camera.capture_sequence(self.stream,use_video_port=True)
-            data = np.fromstring(stream.getvalue(),dtype=np.uint8)
-            # turn the array into a cv2 image
-            self.current_image = cv2.imdecode(data,1)
+            self.camera.capture(self.stream,format='bgr',use_video_port=True)
+
+            # turn the stream to array
+            self.current_image = stream.array
 
             # do processing
             processing(self.current_image)
@@ -60,8 +61,8 @@ class View(threading.Thread):
             self.previous_image = self.current_image
 
             # reinitialize the stream
-            stream.seek(0)
-            stream.truncate()
+            self.stream.seek(0)
+            self.stream.truncate()
 
             end = time.time()
             print "processing time: %d secs" % end - start
