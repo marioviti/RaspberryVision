@@ -56,13 +56,13 @@ class View(threading.Thread):
             #self.camera.capture(self.stream,format='bgr',use_video_port=True)
             self.camera.capture_sequence(self.streams_generator(),use_video_port=True)
 
-            data = np.fromstring(self.stream[0].getvalue(),dtype=np.uint8)
+            data = np.fromstring(self.streams[0].getvalue(),dtype=np.uint8)
             self.previous_image = cv2.imdecode(data,1)
 
-            data = np.fromstring(self.stream[1].getvalue(),dtype=np.uint8)
+            data = np.fromstring(self.streams[1].getvalue(),dtype=np.uint8)
             self.current_image = cv2.imdecode(data,1)
-            # turn the stream to array
-            #self.current_image = self.stream.array
+            # turn the streams to array
+            #self.current_image = self.streams.array
             end = time.time()
             delta = (end - start)
             print "capturing time: %f secs" % delta
@@ -75,12 +75,12 @@ class View(threading.Thread):
             # save previous image
             self.previous_image = self.current_image
 
-            # reinitialize the stream
-            self.stream[0].seek(0)
-            self.stream[0].truncate()
+            # reinitialize the streams
+            self.streams[0].seek(0)
+            self.streams[0].truncate()
 
-            self.stream[1].seek(0)
-            self.stream[1].truncate()
+            self.streams[1].seek(0)
+            self.streams[1].truncate()
 
             end = time.time()
             delta = (end - start)
