@@ -84,7 +84,7 @@ class View(threading.Thread):
             # reinitialize the streams
             for stream in self.streams:
                 stream.seek(0)
-                streams.truncate()
+                stream.truncate()
 
             end = time.time()
             delta = (end - start)
