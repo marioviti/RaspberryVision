@@ -42,7 +42,7 @@ class ImageProcessor(threading.Thread):
                     self.image = cv2.imdecode(data, 1)
                     with image_lock: ## is not thread safe!!!!!
                         cv2.imshow('image',self.image)
-                        k = cv2.waitKey(25)
+                        k = cv2.waitKey(1)
                         if k == 27:         # wait for ESC key to exit
                             cv2.destroyAllWindows()
                             done = True
@@ -88,7 +88,7 @@ with picamera.PiCamera() as camera:
     global image_lock
     lock = threading.Lock()
     image_lock = threading.Lock()
-    pool = [ImageProcessor() for i in range(1)]
+    pool = [ImageProcessor() for i in range(3)]
     camera.resolution = (640, 480)
     camera.framerate = 10
     #camera.start_preview()
