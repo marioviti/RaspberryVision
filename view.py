@@ -22,28 +22,41 @@ def initialize_camera(res=(640, 480),fr=30):
     return camera
 
 class View(threading.Thread):
-    def __init__(self):
-
+    def __init__(self, buffering_size=3):
+    """
+        framerate is 30 fps, so by taking 3 images at the time
+        we have therefore a limit of 10 hz processing frequency
+        for serving our caller!!!!
+    """
         print "View starting"
 
         # initialize the state
         super(View, self).__init__()
-        # this will be used to interact with the caller
+        self.buffering_size = buffering_size
         self.called = threading.Event()
         self.terminated = False
 
         # camera object
         self.camera = initialize_camera()
 
+        self.streams = []
+        self.images = []
+        self.initialize_streams()
         # data structures for images
-        #self.stream = PiRGBArray(self.camera)
-        self.streams = [ io.BytesIO(), io.BytesIO() ]
-        self.current_image = None
-        self.previous_image = None
 
         self.start()
 
+
+    def initialize_streams(self):
+        for i in xrange(self.buffering_size):
+            self.streams += [ io.BytesIO() ]
+            self.images += [ None ]
+
+
     def streams_generator(self):
+        """
+            yielding the generators for our streams
+        """
         for stream in self.streams:
             yield stream
 
@@ -56,11 +69,10 @@ class View(threading.Thread):
             #self.camera.capture(self.stream,format='bgr',use_video_port=True)
             self.camera.capture_sequence(self.streams_generator(),use_video_port=True)
 
-            data = np.fromstring(self.streams[0].getvalue(),dtype=np.uint8)
-            self.previous_image = cv2.imdecode(data,1)
+            for i in xrange(self.buffering_size):
+                data = np.fromstring(self.streams[i].getvalue(),dtype=np.uint8)
+                self.images[i] = cv2.imdecode(data,1)
 
-            data = np.fromstring(self.streams[1].getvalue(),dtype=np.uint8)
-            self.current_image = cv2.imdecode(data,1)
             # turn the streams to array
             #self.current_image = self.streams.array
             end = time.time()
@@ -69,18 +81,16 @@ class View(threading.Thread):
 
             start = time.time()
             # do processing
-            processing(self.previous_image)
-            processing(self.current_image)
+            for image in self.images:
+                processing(image)
+                processing(self.current_image)
 
             # save previous image
-            self.previous_image = self.current_image
 
             # reinitialize the streams
-            self.streams[0].seek(0)
-            self.streams[0].truncate()
-
-            self.streams[1].seek(0)
-            self.streams[1].truncate()
+            for stream in self.streams:
+                stream.seek(0)
+                streams.truncate()
 
             end = time.time()
             delta = (end - start)
