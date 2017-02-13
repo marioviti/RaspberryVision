@@ -2,6 +2,7 @@ import io
 import cv2
 import picamera
 import numpy as np
+import time
 
 with picamera.PiCamera() as camera:
     camera.resolution = (640, 480)
