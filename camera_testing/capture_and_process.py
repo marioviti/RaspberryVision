@@ -40,10 +40,12 @@ class ImageProcessor(threading.Thread):
                     # Read the image and do some processing on it
                     data = np.fromstring(self.stream.getvalue(), dtype=np.uint8)
                     self.image = cv2.imdecode(data, 1)
-                    #with image_lock: ## is not thread safe!!!!!
-                    cv2.imshow('image',self.image)
-                    print self.image.shape
-                    print ""
+                    with image_lock: ## is not thread safe!!!!!
+                        cv2.imshow('image',self.image)
+                        k = cv2.waitKey(25)
+                        if k == 27:         # wait for ESC key to exit
+                            cv2.destroyAllWindows()
+                            done = True
                     # Set done to True if you want the script to terminate
                     # at some point
                     # print self.image.shape
