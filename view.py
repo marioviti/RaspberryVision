@@ -53,6 +53,11 @@ class View(threading.Thread):
             # turn the stream to array
             self.current_image = self.stream.array
 
+            end = time.time()
+            delta = (end - start)
+            print "capturing time: %f secs" % delta
+
+            start = time.time()
             # do processing
             processing(self.current_image)
 
