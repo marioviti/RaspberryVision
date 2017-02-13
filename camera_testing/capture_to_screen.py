@@ -16,7 +16,7 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
     cv2.imshow("image",image)
     key = cv2.waitKey(0) & 0xFF
     rawCapture.seek(0)
-    rawCapture.truncate(0)
+    rawCapture.truncate()
     # if the `q` key was pressed, break from the loop
     if key == ord("q"):
         break
