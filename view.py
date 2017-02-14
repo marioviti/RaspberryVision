@@ -18,7 +18,7 @@ def processing(image):
         shutdown = True
     return
 
-def initialize_camera(res=(400, 400),fr=30):
+def initialize_camera(res=(640, 480),fr=30):
     camera = PiCamera()
     # let camera warm up!!!!!!!!!!!!!!
     # this is extremely important, readings from sensor
