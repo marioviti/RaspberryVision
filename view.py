@@ -29,7 +29,7 @@ def initialize_camera(res=(400, 400),fr=30):
     return camera
 
 class View(threading.Thread):
-    def __init__(self, buffering_size=3):
+    def __init__(self, buffering_size=5):
         print "View starting"
 
         # initialize the state
