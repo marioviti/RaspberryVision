@@ -31,10 +31,20 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
     if i == 10:
         break
 
-contours_tag = []
+c = []
 for tag_id in tag_ids:
-    contours_tag += [contours[tag_id]]
-cv2.drawContours(image, contours_tag, -1, (255,0,0), 3)
+    c += [contours[tag_id]]
+
+cv2.drawContours(image, c, -1, (255,0,0), 3)
+extLeft = tuple(c[c[:, :, 0].argmin()][0])
+extRight = tuple(c[c[:, :, 0].argmax()][0])
+extTop = tuple(c[c[:, :, 1].argmin()][0])
+extBot = tuple(c[c[:, :, 1].argmax()][0])
+cv2.circle(image, extLeft, 8, (0, 0, 255), -1)
+cv2.circle(image, extRight, 8, (0, 255, 0), -1)
+cv2.circle(image, extLeft, 8, (0, 0, 255), -1)
+cv2.circle(image, extRight, 8, (0, 255, 0), -1)
+
 
 cv2.imshow('image',image)
 cv2.waitKey(0) # press any key

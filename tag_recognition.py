@@ -1,6 +1,15 @@
 import cv2
 import numpy as np
 
+tag_template = {
+"""
+It's a square
+"""
+    "vertices" : [(0,0),(1,0),(0,1),(1,1)],
+}
+
+tags_descriptors = { "vertices" : [] }
+
 def detect_tag(imgray,ar,sigma=1.0,eps=100):
     """
     ar area ratio.
