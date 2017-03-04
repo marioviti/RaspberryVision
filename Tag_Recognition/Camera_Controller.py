@@ -1,7 +1,9 @@
+import picamera
 from picamera import PiCamera
 from picamera.array import PiRGBArray
+import threading
+import cv2
 import time
-
 import Settings
 
 class Camera_Controller(threading.Thread):
@@ -13,14 +15,15 @@ class Camera_Controller(threading.Thread):
         self.initialize_camera()
         # initialize image buffer
         self.initialize_image_buffer()
-        # set _running flag for gracious termination
-        self._running = True
+        # initialize lock
+        self.initialize_locks()
+
 
     def shutdown(self):
-        self._running = False
+        self.running = False
 
     def initialize_locks(self):
-        self.processoing_buffer_lock = threading.Lock()
+        self.processing_buffer_lock = threading.Lock()
 
     def load_camera_settings(self,camera_settings):
         self.resolution = camera_settings['resolution']
@@ -36,19 +39,20 @@ class Camera_Controller(threading.Thread):
         self.camera.framerate = self.framerate
 
     def initialize_image_buffer(self):
-        self.image_buffer = PiRGBArray(camera)
+        self.image_buffer = PiRGBArray(self.camera)
         self.processing_buffer = None
 
     def run(self):
+        print "hello"
+        # setting flag for gracious termination
+        self.running = True
         for frame in self.camera.capture_continuous(self.image_buffer, \
             format=self.frame_format , use_video_port=self.use_video_port):
-            if not self._running:
+            if not self.running:
                 break
-            with self.processoing_buffer_lock:
+            with self.processing_buffer_lock:
+                print "captured image"
                 self.processing_buffer = frame.array.copy() # keep a copy
             self.image_buffer.seek(0)
             self.image_buffer.truncate()
-
-
-# camera experiment
-camera_controller = Camera_Controller()
+        print "good bye"

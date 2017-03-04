@@ -10,19 +10,19 @@ It's a square
 
 tags_descriptors = { "vertices" : [] }
 
-def processing_image(image):
+def pre_processing_image(image):
     """
         this operations block the image acquisition
     """
     imgray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
-    ret,thresh = cv2.threshold(imgray,127,255,0)
-    contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-    return contours, hierarchy
+    return imgray
 
-def detecting_tag(contours, hierarchy, area_ratio, sigma=1.0,eps=100):
+def detecting_tag(imgray, ar=2.205175, sigma=1.0, eps=100):
     """
         post ptocessing
     """
+    ret,thresh = cv2.threshold(imgray,127,255,0)
+    contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
     tag_ids = []
     hierarchy = hierarchy[0]
     for curr in xrange(1,len(contours)):
@@ -36,8 +36,6 @@ def detecting_tag(contours, hierarchy, area_ratio, sigma=1.0,eps=100):
                     tag_ids += [curr,child]
     tag_ids = np.unique(tag_ids)
     return contours, tag_ids
-
-
 
 def detect_tag(imgray,ar,sigma=1.0,eps=100):
     """
