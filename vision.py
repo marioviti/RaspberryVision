@@ -31,10 +31,11 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
     if i == 10:
         break
 
-c = []
+cnts_tag = []
 for tag_id in tag_ids:
-    c += [contours[tag_id]]
+    cnts_tag += [contours[tag_id]]
 
+<<<<<<< HEAD
 cv2.drawContours(image, c, -1, (255,0,0), 3)
 for
 extLeft = tuple(c[c[:, :, 0].argmin()][0])
@@ -45,6 +46,14 @@ cv2.circle(image, extLeft, 8, (0, 0, 255), -1)
 cv2.circle(image, extRight, 8, (0, 255, 0), -1)
 cv2.circle(image, extTop, 8, (0, 0, 255), -1)
 cv2.circle(image, extBot, 8, (0, 255, 0), -1)
+=======
+cv2.drawContours(image, cnts_tag, -1, (255,0,0), 3)
+for c in cnts_tag:
+    extLeft = tuple(c[c[:, :, 0].argmin()][0])
+    extRight = tuple(c[c[:, :, 0].argmax()][0])
+    cv2.circle(image, extLeft, 8, (0, 0, 255), -1)
+    cv2.circle(image, extRight, 8, (0, 255, 0), -1)
+>>>>>>> 4dcf29ab47f124f8043e4c3a2efc614ad37c83a5
 
 
 cv2.imshow('image',image)
