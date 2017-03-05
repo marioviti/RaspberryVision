@@ -18,7 +18,6 @@ class Camera_Controller(threading.Thread):
         # initialize lock
         self.initialize_locks()
 
-
     def shutdown(self):
         self.running = False
 
@@ -43,7 +42,6 @@ class Camera_Controller(threading.Thread):
         self.processing_buffer = None
 
     def run(self):
-        print "hello"
         # setting flag for gracious termination
         self.running = True
         for frame in self.camera.capture_continuous(self.image_buffer, \
@@ -51,8 +49,7 @@ class Camera_Controller(threading.Thread):
             if not self.running:
                 break
             with self.processing_buffer_lock:
-                print "captured image"
+                #print "captured image"
                 self.processing_buffer = frame.array.copy() # keep a copy
             self.image_buffer.seek(0)
             self.image_buffer.truncate()
-        print "good bye"
