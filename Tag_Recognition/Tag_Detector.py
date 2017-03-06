@@ -15,6 +15,9 @@ class Tag_Detector(threading.Thread):
         self.tag_area_ratio = tag_settings['area_ratio']
 
     def initialize_results(self):
+        # jollyfull threading problem reference
+        self.available_chop_stick = True
+        self.retrieve_chop_stick = False
         self.tag_orientations = None
 
     def initialize_locks(self):
@@ -40,8 +43,13 @@ class Tag_Detector(threading.Thread):
                     for i in range(len(extsLeft)):
                         ori = tag_recognition.triangle_orientation(extsLeft[i],extsRight[i],extsTop[i],extsBottom[i])
                         self.tag_orientations += [ori]
+                    self.available_chop_stick = True
+                    self.pick_up_chop_stick = False
         self.shutdown()
 
     def retrieve_tag_orientations(self):
         with self.processing_result_lock:
-            return self.tag_orientations
+            if self.pick_up_chop_stick:
+                self.available_chop_stick = False
+            self.pick_up_chop_stick = True
+            return self.available_chop_stick ,self.tag_orientations

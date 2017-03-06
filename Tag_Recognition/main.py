@@ -27,8 +27,8 @@ if __name__ == '__main__':
     time.sleep(4)
     print "let's start!!!"
     while(RUNNING):
-        orientation = tag_detector.retrieve_tag_orientations()
-        if orientation!=[]:
+        newresults, orientation = tag_detector.retrieve_tag_orientations()
+        if orientation!=[] and newresults:
             print orientation
     tag_detector.shutdown()
     print "good bye"
