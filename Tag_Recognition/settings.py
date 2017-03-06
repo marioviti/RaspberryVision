@@ -1,9 +1,9 @@
 
-Tag_Settings = {
+tag_settings = {
     'area_ratio' : 1.81289856025 # triangle tag 2.205175 squares
 }
 
-Camera_Settings = {
+camera_settings = {
     'resolution' : (640,480),
     'framerate' : 30,
     'frame': {

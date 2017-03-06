@@ -4,10 +4,10 @@ from picamera.array import PiRGBArray
 import threading
 import cv2
 import time
-import Settings
+import settings
 
 class Camera_Controller(threading.Thread):
-    def __init__(self, camera_settings = Settings.Camera_Settings):
+    def __init__(self, camera_settings = settings.camera_settings):
         super(Camera_Controller, self).__init__()
         # load camera settings
         self.load_camera_settings(camera_settings)

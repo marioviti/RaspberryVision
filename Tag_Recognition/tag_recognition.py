@@ -2,6 +2,9 @@ import cv2
 import numpy as np
 from numpy import linalg as lnag
 
+TRIANGLE_TYPE = 0
+SQUARE_TYPE = 1
+
 def pre_processing_image(image):
     imgray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
     return imgray
@@ -58,4 +61,19 @@ def detecting_tag(imgray, ar, sigma=1.0, eps=100):
                 if area_ratio <= ar+2*sigma and area_ratio >= ar-2*sigma and area_1>eps:
                     tag_ids += [curr,child]
     tag_ids = np.unique(tag_ids)
-    return contours, tag_ids
+    contours_tag = []
+    for tag_id in tag_ids:
+        contours_tag += [contours[tag_id]]
+    return contours_tag, tag_ids
+
+def estimate_Affine(src,dst, tag_type=TRIANGLE_TYPE):
+    if tag_type == TRIANGLE_TYPE:
+        src = add_center_triangle(src_tag_edges)
+        dst = add_center_triangle(dst_tag_edges)
+    estimated_M = cv2.getPerspectiveTransform(src, dst)
+    return estimated_M
+
+def add_center_triangle(t):
+    ox = (t[0][0]+t[1][0]+t[2][0])/3.
+    oy = (t[0][1]+t[1][1]+t[2][1])/3.
+    return np.vstack((t,[ox,oy]))
