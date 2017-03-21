@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 from Tag_Detector import Tag_Detector
-import Settings
+import settings
 import tag_recognition
 
 RUNNING = True
