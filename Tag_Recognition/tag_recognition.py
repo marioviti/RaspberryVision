@@ -1,17 +1,16 @@
 import cv2
 import numpy as np
 from numpy import linalg as lnag
+import image_utils
 #from sklearn.cluster import KMeans
 
-@profile
-def detecting_tag(gray_image, ar, sigma=0.3):
+def detect_tag_contours(gray_image, ar, sigma=0.3):
     # compute the mean of the single channel pixel intensities
-    v = np.mean(gray_image)
-	# apply automatic Canny edge detection using the computed median
+    v = np.median(gray_image)
+	# apply automatic Canny edge detection using the computed mean
     lower = int(max(0, (1.0 - sigma) * v))
     upper = int(min(255, (1.0 + sigma) * v))
     edged = cv2.Canny(gray_image, lower, upper)
-
     tag_contours = find_tag_contours(edged,ar)
     tag_boxes = map(rot_bounding_box,tag_contours)
     return tag_boxes
@@ -25,11 +24,11 @@ def is_tag_cnt(cnt_p, cnt_c, ar, sigma, eps):
             return True
     return False
 
-@profile
 def find_tag_contours(image, ar, sigma=0.3, eps=20):
     """
-        eps and sigma are found experimentally
-        post ptocessing
+        eps and sigma are found experimentally:
+            -sigma is the variance of the area_ratio.
+            -eps is the minimum area in pixel for a contour to be considered.
     """
     contours, hierarchy = cv2.findContours(image,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
     if hierarchy is None:
@@ -39,9 +38,9 @@ def find_tag_contours(image, ar, sigma=0.3, eps=20):
     hierarchy = hierarchy[0]
     occour = np.zeros(N,np.dtype(np.bool))
     for curr in xrange(1,N):
-        if (not occour[curr]):
+        if not occour[curr]:
             child = hierarchy[curr][2]
-            if child!=-1 and is_tag_cnt(contours[curr],contours[child],ar,sigma,eps):
+            if child!=-1 and child<N-1 and is_tag_cnt(contours[curr],contours[child],ar,sigma,eps):
                 next_curr = child+1
                 next_child = hierarchy[next_curr][2]
                 if next_child!=-1 and is_tag_cnt(contours[next_curr],contours[next_child],ar,sigma,eps):

@@ -1,12 +1,10 @@
 
-tag_settings = {
-    'area_ratio' : 1.81289856025 # triangle tag 2.205175 squares
-}
-
 
 TRIANGLE_TYPE = 'triangle'
 SQUARE_TYPE = 'square'
 DOUBLE_SQUARE_TYPE = 'double_square'
+
+AREA_RATIO_KEY = 'area_ratio'
 
 tags_settings = {
                     'double_square' : {

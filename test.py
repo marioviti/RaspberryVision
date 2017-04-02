@@ -10,8 +10,8 @@ import sys
 def test_tag_detection(path):
     image = image_utils.read_image(path)
     grey_image = image_utils.convert_grey(image)
-    tag_contours = tag_recognition.detecting_tag(grey_image,settings.tags_settings[settings.DOUBLE_SQUARE_TYPE]['area_ratio'])
-    image = image_utils.draw_contours(image,tag_contours)    
+    tag_contours = tag_recognition.detect_tag_contours(grey_image,settings.tags_settings[settings.DOUBLE_SQUARE_TYPE]['area_ratio'])
+    image = image_utils.draw_contours(image,tag_contours)
     image_utils.show_image(image)
 
 test_opz = { 'tag_detection': test_tag_detection, }
