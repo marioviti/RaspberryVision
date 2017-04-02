@@ -1,6 +1,6 @@
 
-import opee
+import cvtest
 import numpy
 a = numpy.zeros( (2,3,4) )
-d = opee.example(a)
+cvtest.example()
 print d

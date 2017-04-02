@@ -1,8 +1,7 @@
 #include "Python.h"
 #include "numpy/arrayobject.h"
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
 
 #include <iostream>
 #include <stdio.h>
@@ -11,7 +10,7 @@
 using namespace cv;
 using namespace std;
 
-static PyObject* example (PyObject *self, PyObject *args)
+static PyObject* example (PyObject *dummy, PyObject *args)
 {
     PyObject *arg1=NULL;
     PyObject *arr1=NULL;
@@ -28,9 +27,10 @@ static PyObject* example (PyObject *self, PyObject *args)
 
     Py_DECREF(arr1);
 
+    return PyInt_FromLong(nd);
+
     int thresh = 100;
     Mat src_gray = Mat::zeros(100,100, CV_8UC1);
-
     Mat canny_output;
     vector<vector<Point> > contours;
     vector<Vec4i> hierarchy;
@@ -39,22 +39,6 @@ static PyObject* example (PyObject *self, PyObject *args)
     Canny( src_gray, canny_output, 100, 100*2, 3 );
     /// Find contours
     findContours( canny_output, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
-
-    /// Draw contours
-    Mat drawing = Mat::zeros( canny_output.size(), CV_8UC3 );
-
-    cout << canny_output.size() << '\n';
-
-    return PyInt_FromLong(nd);
-
-
-    /*
-    for( int i = 0; i< contours.size(); i++ )
-       {
-         Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
-         drawContours( drawing, contours, i, color, 2, 8, hierarchy, 0, Point() );
-       }
-      */
 }
 
 static struct PyMethodDef methods[] = {
@@ -64,6 +48,6 @@ static struct PyMethodDef methods[] = {
 
 PyMODINIT_FUNC initcvtest (void)
 {
-    (void)Py_InitModule("cvtest", methods);
+    (void)Py_InitModule("opencvTest", methods);
     import_array();
 }

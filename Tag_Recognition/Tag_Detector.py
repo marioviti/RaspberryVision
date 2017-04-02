@@ -2,6 +2,7 @@ from Camera_Controller import Camera_Controller
 import settings
 import tag_recognition
 import threading
+import cv2
 
 class Tag_Detector(threading.Thread):
     def __init__(self, tag_settings = settings.tag_settings):
@@ -16,8 +17,8 @@ class Tag_Detector(threading.Thread):
 
     def initialize_results(self):
         # jollyfull threading problem reference
-        self.available_chop_stick = True
-        self.retrieve_chop_stick = False
+        self.available_chop_stick = False
+        self.pick_up_chop_stick = False
         self.tag_orientations = None
 
     def initialize_locks(self):
@@ -30,10 +31,16 @@ class Tag_Detector(threading.Thread):
     def run(self):
         self.running = True
         self.camera_controller.start()
+        imgray = None
+        contours_tag = None
         while(self.running):
-            imgray = None
             with self.camera_controller.processing_buffer_lock:
                 if self.camera_controller.processing_buffer != None:
+                    """test
+                    cv2.drawContours(self.camera_controller.processing_buffer, contours_tag, -1, (0,255,0), 3)
+                    cv2.imshow("image",self.camera_controller.processing_buffer)
+                    cv2.waitKey(0)
+                    test"""
                     imgray = tag_recognition.pre_processing_image(self.camera_controller.processing_buffer)
             if imgray!= None:
                 contours_tag, tag_ids = tag_recognition.detecting_tag(imgray,self.tag_area_ratio)
