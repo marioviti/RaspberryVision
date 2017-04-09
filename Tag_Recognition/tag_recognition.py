@@ -3,7 +3,65 @@ import numpy as np
 from numpy import linalg as lnag
 import image_utils
 #from sklearn.cluster import KMeans
+
+def threshold_tag(tag_image):
+    max_v = np.max(tag_image)
+    min_v = np.min(tag_image)
+    thresh = (min_v+min_v) /2.
+    ret,thresh = cv2.threshold(tag_image,thresh,max_v,min_v)
+    return thresh
+
 @profile
+def deskew(image,cnt,auto_size=False,h_size=100,w_size=100):
+    pts = cnt.reshape(4, 2)
+    rect = np.zeros((4, 2), dtype = np.float32)
+    s = pts.sum(axis = 1)
+    rect[0] = pts[np.argmin(s)]
+    rect[2] = pts[np.argmax(s)]
+    diff = np.diff(pts, axis = 1)
+    rect[1] = pts[np.argmin(diff)]
+    rect[3] = pts[np.argmax(diff)]
+
+    # now that we have our rectangle of points, let's compute
+    # the width of our new image
+    (tl, tr, br, bl) = rect
+    widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
+    widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
+
+    # ...and now for the height of our new image
+    heightA = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
+    heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
+
+    # take the maximum of the width and height values to reach
+    # our final dimensions
+    if auto_size:
+        maxWidth = max(int(widthA), int(widthB))
+        maxHeight = max(int(heightA), int(heightB))
+    else:
+        maxWidth = w_size
+        maxHeight = h_size
+
+    # construct our destination points which will be used to
+    # map the screen to a top-down, "birds eye" view
+    dst = np.array([
+    	[0, 0],
+    	[maxWidth - 1, 0],
+    	[maxWidth - 1, maxHeight - 1],
+    	[0, maxHeight - 1]], dtype = np.float32)
+
+    # calculate the perspective transform matrix and warp
+    # the perspective to grab the screen
+    M = cv2.getPerspectiveTransform(rect, dst)
+    warp = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
+    return warp
+
+def detect_tags(gray_image, ar, sigma=0.3):
+    tag_contours = detect_tag_contours(gray_image, ar, sigma=0.3)
+    warped_tag = []
+    for tag_contour in tag_contours:
+        warped_tag += [ deskew(gray_image,tag_contour) ]
+    return tag_contours, map(threshold_tag,warped_tag)
+
 def detect_tag_contours(gray_image, ar, sigma=0.3):
     # compute the mean of the single channel pixel intensities
     v = np.median(gray_image)
@@ -12,17 +70,14 @@ def detect_tag_contours(gray_image, ar, sigma=0.3):
     upper = int(min(255, (1.0 + sigma) * v))
     edged = cv2.Canny(gray_image, lower, upper)
     tag_contours = find_tag_contours(edged,ar)
-    tag_boxes = map(countour_extreme_points,tag_contours)
-    return tag_boxes
+    tag_boxes = map(rot_bounding_box,tag_contours)
+    return tag_contours
 
 def is_tag_cnt(cnt_p, cnt_c, ar, sigma, eps):
     area_1 = cv2.contourArea(cnt_p)
     area_2 = cv2.contourArea(cnt_c)
-    if area_1>eps and area_2>eps:
-        area_ratio = area_1/area_2
-        if area_ratio <= ar+sigma and area_ratio >= ar-sigma:
-            return True
-    return False
+    area_ratio = area_1/float(area_2)
+    return area_1>eps and area_2>eps and area_ratio <= ar+sigma and area_ratio >= ar-sigma
 
 def find_tag_contours(image, ar, sigma=0.3, eps=20, approx = cv2.CHAIN_APPROX_NONE):
     """
@@ -41,22 +96,33 @@ def find_tag_contours(image, ar, sigma=0.3, eps=20, approx = cv2.CHAIN_APPROX_NO
     occour = np.zeros(N,np.dtype(np.bool))
     for curr in xrange(1,N):
         if not occour[curr]:
-            child = hierarchy[curr][2]
-            if child!=-1 and child<N-1 and is_tag_cnt(contours[curr],contours[child],ar,sigma,eps):
-                next_curr = child+1
-                next_child = hierarchy[next_curr][2]
-                if next_child!=-1 and is_tag_cnt(contours[next_curr],contours[next_child],ar,sigma,eps):
-                    if not occour[curr]:
-                        occour[curr] = True
-                        tag_contours += [contours[curr]]
-                    if not occour[child]:
-                        occour[child] = True
-                    if not occour[next_curr]:
-                        occour[next_curr] = True
-                    if not occour[next_child]:
-                        occour[next_child] = True
-                        tag_contours += [contours[next_child]]
+            curr_approxTop = approx_cnt(contours[curr])
+            if len(curr_approxTop) == 4:
+                child = hierarchy[curr][2]
+                child_approxTop = approx_cnt(contours[child])
+                if child!=-1 and child<N-1 and len(child_approxTop) == 4 and is_tag_cnt(contours[curr],contours[child],ar,sigma,eps):
+                    next_curr = child+1
+                    next_curr_approxTop = approx_cnt(contours[next_curr])
+                    if len(next_curr_approxTop) == 4:
+                        next_child = hierarchy[next_curr][2]
+                        next_child_approxTop = approx_cnt(contours[next_child])
+                        if next_child!=-1 and next_child<N-1 and len(next_child_approxTop) == 4 and is_tag_cnt(contours[next_curr],contours[next_child],ar,sigma,eps):
+                            if not occour[curr]:
+                                occour[curr] = True
+                                #tag_contours += [curr_approxTop]
+                            if not occour[child]:
+                                occour[child] = True
+                            if not occour[next_curr]:
+                                occour[next_curr] = True
+                            if not occour[next_child]:
+                                occour[next_child] = True
+                                tag_contours += [next_child_approxTop]
     return tag_contours
+
+def approx_cnt(cnt):
+    peri = cv2.arcLength(cnt, True)
+    approxTop = cv2.approxPolyDP(cnt, 0.02 * peri, True)
+    return approxTop
 
 def pre_processing_image(image):
     gray_image = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
@@ -71,13 +137,15 @@ def rot_bounding_box(cnt):
     box = np.int0(box)
     return box
 
-def countour_extreme_points(contour):
-    extLeft,extRight,extTop,extBottom = None,None,None,None
-    extLeft = np.array(contour[contour[:, :, 0].argmin()][0])
-    extRight = np.array(contour[contour[:, :, 0].argmax()][0])
-    extTop = np.array(contour[contour[:, :, 1].argmin()][0])
-    extBottom = np.array(contour[contour[:, :, 1].argmax()][0])
-    return np.array([extLeft,extRight,extTop,extBottom])
+
+
+#def countour_extreme_points(contour):
+#    extLeft,extRight,extTop,extBottom = None,None,None,None
+#    extLeft = np.array(contour[contour[:, :, 0].argmin()][0])
+#    extRight = np.array(contour[contour[:, :, 0].argmax()][0])
+#    extTop = np.array(contour[contour[:, :, 1].argmin()][0])
+#    extBottom = np.array(contour[contour[:, :, 1].argmax()][0])
+#    return np.array([extLeft,extRight,extTop,extBottom])
 
 
 ##ef triangle_orientation(L,R,T,B):

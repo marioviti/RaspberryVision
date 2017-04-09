@@ -10,8 +10,11 @@ import sys
 def test_tag_detection(path):
     image = image_utils.read_image(path)
     grey_image = image_utils.convert_grey(image)
-    tag_contours = tag_recognition.detect_tag_contours(grey_image,settings.tags_settings[settings.DOUBLE_SQUARE_TYPE]['area_ratio'])
+    ar = settings.tags_settings[settings.DOUBLE_SQUARE_TYPE]['area_ratio']
+    tag_contours,warped_tags = tag_recognition.detect_tags(grey_image,ar)
     image = image_utils.draw_contours(image,tag_contours)
+    for warped_tag in warped_tags:
+        image_utils.show_image(warped_tag)
     image_utils.show_image(image)
 
 test_opz = { 'tag_detection': test_tag_detection, }
