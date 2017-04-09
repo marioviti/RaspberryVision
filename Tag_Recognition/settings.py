@@ -24,5 +24,8 @@ camera_settings = {
     'frame': {
         'format' : "bgr",
         'use_video_port' : True
-    }
+    },
+    'awb' : False,
+    'awb_gains' : (0.9,0.9), # allowed 0-1.9
+    'aexposure' : True,
 }

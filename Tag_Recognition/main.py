@@ -9,11 +9,18 @@ import tag_recognition
 import image_utils
 
 RUNNING = True
+TESTING = False
 
-def signal_handler(signal, frame):
-    print "CTRL-C"
+def signal_handler_stop_running(signal, frame):
+    print signal
+    print "signal_handler_stop_running"
     global RUNNING
     RUNNING = False
+
+def signal_handler_test(signal, frame):
+    print "signal_handler_test"
+    global TESTING
+    TESTING = True
 
 framecount = 0
 def count_frames(image):
@@ -52,7 +59,8 @@ if __name__ == '__main__':
 
     global RUNNING
     RUNNING = True
-    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler_stop_running)
+    signal.signal(signal.SIGTSTP, signal_handler_test)
     image_processor = Image_Processor()
     image_processor.set_preprocessing_function(image_utils.convert_grey)
     image_processor.set_post_processing_function(tag_detector.detect_tag)
@@ -63,7 +71,13 @@ if __name__ == '__main__':
     countours = None
     while(RUNNING):
         newresults, countours = image_processor.retrieve_post_results()
+        if TESTING:
+            TESTING = False
+            rgb_image = np.zeros((tag_detector.prec_frame.shape[0],tag_detector.prec_frame.shape[1],3),dtype=np.uint8)
+            rgb_image[:,:,0] = tag_detector.prec_frame
+            rgb_image[:,:,1] = rgb_image[:,:,0]
+            rgb_image[:,:,2] = rgb_image[:,:,0]
+            rgb_image = image_utils.draw_contours(rgb_image,countours)
+            image_utils.show_image(rgb_image)
     image_processor.shutdown()
-    image = image_utils.draw_contours(tag_detector.prec_frame,countours)
-    image_utils.show_image(image)
     print "good bye"

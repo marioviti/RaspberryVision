@@ -3,7 +3,7 @@ import numpy as np
 from numpy import linalg as lnag
 import image_utils
 #from sklearn.cluster import KMeans
-
+@profile
 def detect_tag_contours(gray_image, ar, sigma=0.3):
     # compute the mean of the single channel pixel intensities
     v = np.median(gray_image)
@@ -12,7 +12,7 @@ def detect_tag_contours(gray_image, ar, sigma=0.3):
     upper = int(min(255, (1.0 + sigma) * v))
     edged = cv2.Canny(gray_image, lower, upper)
     tag_contours = find_tag_contours(edged,ar)
-    tag_boxes = map(rot_bounding_box,tag_contours)
+    tag_boxes = map(countour_extreme_points,tag_contours)
     return tag_boxes
 
 def is_tag_cnt(cnt_p, cnt_c, ar, sigma, eps):
@@ -24,13 +24,15 @@ def is_tag_cnt(cnt_p, cnt_c, ar, sigma, eps):
             return True
     return False
 
-def find_tag_contours(image, ar, sigma=0.3, eps=20):
+def find_tag_contours(image, ar, sigma=0.3, eps=20, approx = cv2.CHAIN_APPROX_NONE):
     """
+        CHAIN_APPROX_NONE fast result and better response for skewed tags.
+
         eps and sigma are found experimentally:
             -sigma is the variance of the area_ratio.
             -eps is the minimum area in pixel for a contour to be considered.
     """
-    contours, hierarchy = cv2.findContours(image,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(image,cv2.RETR_TREE,approx)
     if hierarchy is None:
         return contours
     tag_contours = []
@@ -69,13 +71,13 @@ def rot_bounding_box(cnt):
     box = np.int0(box)
     return box
 
-##ef countour_extreme_points(contour):
-##    extLeft,extRight,extTop,extBottom = None,None,None,None
-##    extLeft = np.array(contour[contour[:, :, 0].argmin()][0])
-##    extRight = np.array(contour[contour[:, :, 0].argmax()][0])
-##    extTop = np.array(contour[contour[:, :, 1].argmin()][0])
-##    extBottom = np.array(contour[contour[:, :, 1].argmax()][0])
-##    return extLeft,extRight,extTop,extBottom
+def countour_extreme_points(contour):
+    extLeft,extRight,extTop,extBottom = None,None,None,None
+    extLeft = np.array(contour[contour[:, :, 0].argmin()][0])
+    extRight = np.array(contour[contour[:, :, 0].argmax()][0])
+    extTop = np.array(contour[contour[:, :, 1].argmin()][0])
+    extBottom = np.array(contour[contour[:, :, 1].argmax()][0])
+    return np.array([extLeft,extRight,extTop,extBottom])
 
 
 ##ef triangle_orientation(L,R,T,B):
