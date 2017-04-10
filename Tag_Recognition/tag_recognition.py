@@ -4,15 +4,21 @@ from numpy import linalg as lnag
 import image_utils
 #from sklearn.cluster import KMeans
 
+def identify_tag(tag_image):
+    return None
+
 def threshold_tag(tag_image):
-    max_v = np.max(tag_image)
+    max_v = max(np.max(tag_image),255)
     min_v = np.min(tag_image)
-    thresh = (min_v+min_v) /2.
-    ret,thresh = cv2.threshold(tag_image,thresh,max_v,min_v)
+    thresh = (max_v+min_v)/2.
+    ret,thresh = cv2.threshold(tag_image,thresh,255,0)
     return thresh
 
 @profile
-def deskew(image,cnt,auto_size=False,h_size=100,w_size=100):
+def deskew(image,cnt,auto_size=False,h_size=100,w_size=100,bleed=5):
+    """
+    Square tags
+    """
     pts = cnt.reshape(4, 2)
     rect = np.zeros((4, 2), dtype = np.float32)
     s = pts.sum(axis = 1)
@@ -53,14 +59,18 @@ def deskew(image,cnt,auto_size=False,h_size=100,w_size=100):
     # the perspective to grab the screen
     M = cv2.getPerspectiveTransform(rect, dst)
     warp = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
-    return warp
+    return warp[bleed:w_size-bleed,bleed:h_size-bleed]
 
 def detect_tags(gray_image, ar, sigma=0.3):
-    tag_contours = detect_tag_contours(gray_image, ar, sigma=0.3)
-    warped_tag = []
+    tag_contours, edged = detect_tag_contours(gray_image, ar, sigma=0.3)
+    warped_tags = []
+    tag_ids = []
     for tag_contour in tag_contours:
-        warped_tag += [ deskew(gray_image,tag_contour) ]
-    return tag_contours, map(threshold_tag,warped_tag)
+        warped_tags += [ deskew(gray_image,tag_contour) ]
+    warped_tags = map(threshold_tag,warped_tags)
+    for warped_tag in warped_tags:
+        tag_ids += [ identify_tag(warped_tag) ]
+    return tag_contours, warped_tags, tag_ids
 
 def detect_tag_contours(gray_image, ar, sigma=0.3):
     # compute the mean of the single channel pixel intensities
@@ -71,7 +81,7 @@ def detect_tag_contours(gray_image, ar, sigma=0.3):
     edged = cv2.Canny(gray_image, lower, upper)
     tag_contours = find_tag_contours(edged,ar)
     tag_boxes = map(rot_bounding_box,tag_contours)
-    return tag_contours
+    return tag_contours, edged
 
 def is_tag_cnt(cnt_p, cnt_c, ar, sigma, eps):
     area_1 = cv2.contourArea(cnt_p)

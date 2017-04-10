@@ -11,8 +11,9 @@ def test_tag_detection(path):
     image = image_utils.read_image(path)
     grey_image = image_utils.convert_grey(image)
     ar = settings.tags_settings[settings.DOUBLE_SQUARE_TYPE]['area_ratio']
-    tag_contours,warped_tags = tag_recognition.detect_tags(grey_image,ar)
+    tag_contours,warped_tags,tag_ids = tag_recognition.detect_tags(grey_image,ar)
     image = image_utils.draw_contours(image,tag_contours)
+    print tag_ids
     for warped_tag in warped_tags:
         image_utils.show_image(warped_tag)
     image_utils.show_image(image)
