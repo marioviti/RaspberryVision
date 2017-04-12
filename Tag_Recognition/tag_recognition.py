@@ -4,6 +4,35 @@ from numpy import linalg as lnag
 import image_utils
 #from sklearn.cluster import KMeans
 
+def distance_from_angluar_diameter(theta,D):
+    """
+    theta is the angluar diameter which is proportional to the number of pixel
+    occipied by the image, D is the actual known diameter of the tag.
+    """
+    return np.tan(theta)*2*D
+
+def calculate_angular_diameter(a_b,a_1_b_1,alpha):
+    """
+    a b are respectively the bottom and the top of the image
+    a_1 and b_1 are respectively the bottom and the top of the projection of
+    an object
+    alpha is the angle at the aphex in degrees for the vertical axis(longitudinal)
+    """
+    return (a_1_b_1/float(a_b)) * (alpha*(np.pi/180.)) # transform alpha in radiants
+
+def estimate_distance(cnt,image_h,alpha=45,D=1):
+    """
+    image_h heitght of the image
+    alpha longitudinal angle of the camera fov (usually 45 deg for picamera)
+    D is the actual diameter of the circle outscribed the tag
+    """
+    # calculate the side to get the diam
+    #eter od the inscript circle
+    centre, radius = min_circle(cnt)
+    d = 2*radius
+    theta = calculate_angular_diameter(image_h,d,alpha=alpha)
+    return distance_from_angluar_diameter(theta,D)
+
 def identify_tag(tag_image):
     return None
 
@@ -13,6 +42,15 @@ def threshold_tag(tag_image):
     thresh = (max_v+min_v)/2.
     ret,thresh = cv2.threshold(tag_image,thresh,255,0)
     return thresh
+
+def extend_square((tl, tr, br, bl), ext_factor, dir_='top'):
+    if dir_=='top':
+        tl1,tr1 = bl*(1-ext_factor)+tl*(ext_factor), br*(1-ext_factor)+tr*(ext_factor)
+        ret = np.array([ [tl1[0],tl1[1]],[tr1[0],tr1[1]],[tl[0],tr[1]],[tr[0],tr[1]] ])
+        return ret.reshape(4,2)
+    elif dir_=='bot':
+        return [tl, tr,tl*(1-ext_factor)+bl*(ext_factor),tr*(1-ext_factor)+br*(ext_factor)]
+    return None
 
 @profile
 def deskew(image,cnt,auto_size=False,h_size=100,w_size=100,bleed=5):
@@ -31,16 +69,16 @@ def deskew(image,cnt,auto_size=False,h_size=100,w_size=100,bleed=5):
     # now that we have our rectangle of points, let's compute
     # the width of our new image
     (tl, tr, br, bl) = rect
-    widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
-    widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
 
-    # ...and now for the height of our new image
-    heightA = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
-    heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
-
-    # take the maximum of the width and height values to reach
-    # our final dimensions
+    # calculate extension of tag
     if auto_size:
+        widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
+        widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
+        # ...and now for the height of our new image
+        heightA = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
+        heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
+        # take the maximum of the width and height values to reach
+        # our final dimensions
         maxWidth = max(int(widthA), int(widthB))
         maxHeight = max(int(heightA), int(heightB))
     else:
@@ -53,20 +91,25 @@ def deskew(image,cnt,auto_size=False,h_size=100,w_size=100,bleed=5):
     	[0, 0],
     	[maxWidth - 1, 0],
     	[maxWidth - 1, maxHeight - 1],
-    	[0, maxHeight - 1]], dtype = np.float32)
+    	[0, maxHeight - 1]],
+        dtype = np.float32)
 
     # calculate the perspective transform matrix and warp
     # the perspective to grab the screen
     M = cv2.getPerspectiveTransform(rect, dst)
-    warp = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
-    return warp[bleed:w_size-bleed,bleed:h_size-bleed]
+    #M1 = cv2.getPerspectiveTransform(ext_square_rect, ext_square_dst)
+    warp = cv2.warpPerspective(image, M, (maxWidth, 35+maxHeight))
+    return warp
 
 def detect_tags(gray_image, ar, sigma=0.3):
     tag_contours, edged = detect_tag_contours(gray_image, ar, sigma=0.3)
     warped_tags = []
     tag_ids = []
+    distances = []
     for tag_contour in tag_contours:
+        distances += [ estimate_distance(tag_contour,gray_image.shape[1]) ]
         warped_tags += [ deskew(gray_image,tag_contour) ]
+    print distances
     warped_tags = map(threshold_tag,warped_tags)
     for warped_tag in warped_tags:
         tag_ids += [ identify_tag(warped_tag) ]
@@ -140,6 +183,10 @@ def pre_processing_image(image):
 
 def bounding_box(cnt):
     return cv2.boundingRect(cnt)
+
+def min_circle(cnt):
+     #(x,y),radius = cv2.minEnclosingCircle(cnt)
+     return cv2.minEnclosingCircle(cnt)
 
 def rot_bounding_box(cnt):
     rect = cv2.minAreaRect(cnt)
