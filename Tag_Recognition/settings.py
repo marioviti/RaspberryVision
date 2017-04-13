@@ -5,10 +5,12 @@ SQUARE_TYPE = 'square'
 DOUBLE_SQUARE_TYPE = 'double_square'
 
 AREA_RATIO_KEY = 'area_ratio'
+DIAGONAL_KEY = 'diagonal'
 
 tags_settings = {
                     'double_square' : {
-                        'area_ratio' : 1.44
+                        'area_ratio' : 1.44,
+                        'diagonal' : 7#cm
                     },
                     'square' : {
                         'area_ratio' : 2.205175

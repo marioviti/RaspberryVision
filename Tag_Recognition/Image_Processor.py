@@ -37,15 +37,19 @@ class Image_Processor(threading.Thread):
         self.camera_controller.start()
         imgray = None
         contours_tag = None
+        new_frame = False
         while(self.running):
             with self.camera_controller.processing_buffer_lock:
                 if self.camera_controller.processing_buffer != None:
                     self.pre_result = self.pre_processing(self.camera_controller.processing_buffer)
+                    new_frame = True
             if self.pre_result != None:
                 with self.processing_result_lock:
-                    self.post_result = self.post_processing(self.pre_result)
-                    self.available_chop_stick = True
-                    self.pick_up_chop_stick = False
+                    if new_frame:
+                        new_frame = False
+                        self.post_result = self.post_processing(self.pre_result)
+                        self.available_chop_stick = True
+                        self.pick_up_chop_stick = False
         self.shutdown()
 
     def retrieve_post_results(self):
