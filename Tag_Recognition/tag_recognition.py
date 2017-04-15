@@ -15,6 +15,17 @@ import image_utils
 
 TAG_ID_ERROR = 99999
 
+def estimate_rotation(rect):
+    (tl, tr, br, bl) = rect
+    x_t = np.sqrt(np.dot((tl-tr),(tl-tr).T))
+    x_b = np.sqrt(np.dot((bl-br),(bl-br).T))
+    y_l = np.sqrt(np.dot((tl-bl),(tl-bl).T))
+    y_r = np.sqrt(np.dot((tr-br),(tr-br).T))
+    sign = 1
+    if y_l > y_r:
+        sign = -1
+    return sign*rad_to_deg( np.arctan( (y_l+y_r) / (x_t+x_b) ) )
+
 def distance_from_angluar_diameter(theta,D):
     """
         theta must be in radiants.
@@ -24,6 +35,9 @@ def distance_from_angluar_diameter(theta,D):
         result will be in the unit of D.
     """
     return np.tan(theta/2.)*2.*D
+
+def rad_to_deg(alpha):
+    return alpha*(180./np.pi)
 
 def deg_to_rad(alpha):
     """
@@ -54,11 +68,13 @@ def estimate_distance(cnt,image_h,alpha=48,D=1):
     """
         image_h heitght of the image
         alpha longitudinal angle of the camera fov (usually 48 deg for picamera)
+        for a 1080 pixel vertical frame
         D is the actual diameter of the circle outscribed the tag
     """
     centre, radius = min_circle(cnt) # the approximation of the object projection
     d = 2*radius
-    theta = deg_to_rad(calculate_angular_diameter(image_h,d,alpha=alpha))
+    alpha_1 = (alpha/1080.)*image_h
+    theta = deg_to_rad(calculate_angular_diameter(image_h,d,alpha=alpha_1))
     return distance_from_angluar_diameter(theta,D)
 
 @profile
@@ -151,6 +167,7 @@ def detect_tags(gray_image, ar, D=1, sigma=0.3):
         warped_tags += [ warper_tag ]
     warped_tags = map(threshold_tag,warped_tags)
     warped_orientations_tags = map(threshold_tag,warped_orientations_tags)
+    rotations = map(estimate_rotation,tag_contours)
     for warped_tag in warped_tags:
         tag_ids += [ identify_tag(warped_tag) ]
     return tag_contours, warped_tags, warped_orientations_tags, tag_ids, tag_distances
