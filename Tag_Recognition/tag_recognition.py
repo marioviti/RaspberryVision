@@ -13,6 +13,8 @@ import image_utils
 #                                                                               #
 #################################################################################
 
+TAG_ID_ERROR = 99999
+
 def distance_from_angluar_diameter(theta,D):
     """
         theta must be in radiants.
@@ -59,9 +61,31 @@ def estimate_distance(cnt,image_h,alpha=48,D=1):
     theta = deg_to_rad(calculate_angular_diameter(image_h,d,alpha=alpha))
     return distance_from_angluar_diameter(theta,D)
 
-# TODO
+@profile
 def identify_tag(tag_image):
-    return None
+    """
+        tag are 3x2 array,
+        sample the center
+    """
+    y,x = tag_image.shape
+    dx,dy = x/3,y/4
+    dtau = 3
+    id_tag = 0
+    for i in range(2):
+        for j in range(3):
+            crdx, crdy = (1+i)*dx,(1+j)*dy
+            sample = np.sum(tag_image[crdy-dtau:crdy+dtau,crdx-dtau:crdx+dtau])/(16.*255.)
+            tag_image[crdy-dtau:crdy+dtau,crdx-dtau:crdx+dtau] = 127
+            # thresholding the noise
+            if sample > 0.75:
+                bit = 1
+            elif sample < 0.25:
+                bit = 0
+            else:
+                #notag
+                return TAG_ID_ERROR
+            id_tag += bit *2**(i+j*2)
+    return id_tag
 
 def threshold_tag(tag_image):
     """
@@ -222,6 +246,12 @@ def rot_bounding_box(cnt):
     box = cv2.cv.BoxPoints(rect)
     box = np.int0(box)
     return box
+
+def k_means(image,k=3):
+    points = np.float32(image.reshape((-1,1)))
+    term_crit = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+    ret, labels, centers = cv2.kmeans(points, k, term_crit, 10, 0)
+    return ret, labels, centers
 
 #def extend_square((tl, tr, br, bl), ext_factor, dir_='top'):
 #    if dir_=='top':
