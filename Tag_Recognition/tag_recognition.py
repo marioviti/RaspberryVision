@@ -15,69 +15,32 @@ import image_utils
 
 TAG_ID_ERROR = 99999
 
-def estimate_rotation(rect):
-    (tl, tr, br, bl) = rect
-    x_t = np.sqrt(np.dot((tl-tr),(tl-tr).T))
-    x_b = np.sqrt(np.dot((bl-br),(bl-br).T))
-    y_l = np.sqrt(np.dot((tl-bl),(tl-bl).T))
-    y_r = np.sqrt(np.dot((tr-br),(tr-br).T))
-    sign = 1
-    if y_l > y_r:
-        sign = -1
-    return sign*rad_to_deg( np.arctan( (y_l+y_r) / (x_t+x_b) ) )
-
-def distance_from_angluar_diameter(theta,D):
-    """
-        theta must be in radiants.
-        theta is the angluar diameter which is proportional to the number of pixel
-        occipied by the image.
-        D is the actual known diameter of the object outscribed circle (approximation).
-        result will be in the unit of D.
-    """
-    return np.tan(theta/2.)*2.*D
-
 def rad_to_deg(alpha):
     return alpha*(180./np.pi)
 
-def deg_to_rad(alpha):
-    """
-        pi radians are 180 degrees.
-    """
-    return alpha*(np.pi/180.)
+def estimate_rotation(rect):
+    (tl, tr, br, bl) = rect
+    y_l = np.sqrt(np.dot((tl-bl),(tl-bl).T))
+    y_r = np.sqrt(np.dot((tr-br),(tr-br).T))
+    x = np.sqrt(np.dot((bl-br),(bl-br).T))
+    y = np.sqrt(np.dot((tl-bl),(tl-bl).T))
+    sign = 1
+    if y_l > y_r:
+        sign = -1
+    return sign*rad_to_deg( np.arctan((y/x)) )
 
-def calculate_angular_diameter(a_b,a_1_b_1,alpha):
+def estimate_distance(cnt,t_a=1,image_h=1080,v_fov=48.5):
     """
-        It is the portion of viewing angle occupied by a circle occupying a
-        portion of screen.
-
-        This circle is an approximation of the projection of an object from the
-        real world onto the screen.
-
-        a_b is the vertical height of the image.
-        a_1_b_1 is the diameter of the circle in pixels and
-        the number of pixel occupied by the object.
-        alpha is the angle at the aphex in degrees for the vertical
-        axis(longitudinal) in deg, this degree can be found on the specs of the
-        camera as fov (field of view).
-
-        output angle is in degrees.
-    """
-    return (a_1_b_1/float(a_b)) * alpha
-
-def estimate_distance(cnt,image_h,alpha=48,D=1):
-    """
-        image_h heitght of the image
-        alpha longitudinal angle of the camera fov (usually 48 deg for picamera)
-        for a 1080 pixel vertical frame
-        D is the actual diameter of the circle outscribed the tag
+        t_a: the actual tag diagonal
+        v_fov: for RASPBERRY camera
+        image_h: video port height
     """
     centre, radius = min_circle(cnt) # the approximation of the object projection
-    d = 2*radius
-    alpha_1 = (alpha/1080.)*image_h
-    theta = deg_to_rad(calculate_angular_diameter(image_h,d,alpha=alpha_1))
-    return distance_from_angluar_diameter(theta,D)
+    t_p = 2*radius
+    alpha = (v_fov/image_h)*t_p
+    return t_a/float(alpha)
 
-@profile
+#@profile
 def identify_tag(tag_image):
     """
         tag are 3x2 array,
@@ -153,24 +116,23 @@ def deskew(image,cnt,auto_size=False,maxWidth=100,maxHeight=100,bleed=5,bottom_o
 
 # using kernprof -v -l for profiling
 # @profile
-# Total time: 0.160422 s
-def detect_tags(gray_image, ar, D=1, sigma=0.3):
+# Total time: 0.220422 s
+def detect_tags(gray_image, ar, t_a=2, sigma=0.3):
     tag_contours, edged = detect_tag_contours(gray_image, ar, sigma=sigma)      # 93.0
     warped_tags = []
     warped_orientations_tags = []
     tag_ids = []
     tag_distances = []
     for tag_contour in tag_contours:
-        tag_distances += [ estimate_distance(tag_contour,gray_image.shape[1],D=D) ]
+        tag_distances += [ estimate_distance(tag_contour,t_a=t_a) ]
         warper_tag, warped_orientations_tag = deskew(gray_image,tag_contour)    # 5.0
         warped_orientations_tags += [ warped_orientations_tag ]
         warped_tags += [ warper_tag ]
     warped_tags = map(threshold_tag,warped_tags)
     warped_orientations_tags = map(threshold_tag,warped_orientations_tags)
     rotations = map(estimate_rotation,tag_contours)
-    for warped_tag in warped_tags:
-        tag_ids += [ identify_tag(warped_tag) ]
-    return tag_contours, warped_tags, warped_orientations_tags, tag_ids, tag_distances
+    tag_ids = map(identify_tag,warped_tags)
+    return tag_contours, warped_tags, warped_orientations_tags, tag_ids, tag_distances, rotations
 
 # using kernprof -v -l for profiling
 # @profile
@@ -269,6 +231,44 @@ def k_means(image,k=3):
     term_crit = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
     ret, labels, centers = cv2.kmeans(points, k, term_crit, 10, 0)
     return ret, labels, centers
+
+#def distance_from_angluar_diameter(theta,D):
+#    """
+#        theta must be in radiants.
+#        theta is the angluar diameter which is proportional to the number of pixel
+#        occipied by the image.
+#        D is the actual known diameter of the object outscribed circle (approximation).
+#        result will be in the unit of D.
+#    """
+#    return np.tan(theta/2.)*2.*D
+
+#def rad_to_deg(alpha):
+#    return alpha*(180./np.pi)
+
+#def deg_to_rad(alpha):
+#    """
+#        pi radians are 180 degrees.
+#    """
+#    return alpha*(np.pi/180.)
+
+#def calculate_angular_diameter(a_b,a_1_b_1,alpha):
+#    """
+#        It is the portion of viewing angle occupied by a circle occupying a
+#        portion of screen.
+
+#        This circle is an approximation of the projection of an object from the
+#        real world onto the screen.
+
+#        a_b is the vertical height of the image.
+#        a_1_b_1 is the diameter of the circle in pixels and
+#        the number of pixel occupied by the object.
+#        alpha is the angle at the aphex in degrees for the vertical
+#        axis(longitudinal) in deg, this degree can be found on the specs of the
+#        camera as fov (field of view).
+
+#        output angle is in degrees.
+#    """
+#    return (a_1_b_1/float(a_b)) * alpha
 
 #def extend_square((tl, tr, br, bl), ext_factor, dir_='top'):
 #    if dir_=='top':

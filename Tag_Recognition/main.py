@@ -47,22 +47,19 @@ class Tag_Detector():
             self.perf_time = time.time()
             self.tag_results = tag_recognition.detect_tags(image,self.tag_settings[settings.AREA_RATIO_KEY])
             self.perf_time = time.time() - self.perf_time
-            tests.log('time',`self.perf_time`)
+            #tests.log('time',`self.perf_time`)
         elif self.count == 0:
             self.diff_frame = image - self.prec_frame
             self.prec_frame = image
             self.count = 1
         elif self.count == 1:
             self.count = 0
-            print 'helo'
             self.prec_frame = image
             self.perf_time = time.time()
             self.tag_results = tag_recognition.detect_tags(image,
                 self.tag_settings[settings.AREA_RATIO_KEY],
                 D=self.tag_settings[settings.DIAGONAL_KEY])
             self.perf_time = time.time() - self.perf_time
-            tests.log('time',`self.perf_time`)
-            print self.perf_time
         return self.tag_results
 
 if __name__ == '__main__':
@@ -85,18 +82,23 @@ if __name__ == '__main__':
     tags_info = None
     while(RUNNING):
         newresults, tags_info = image_processor.retrieve_post_results()
-        tag_contours, warped_tags, warped_orientations_tags, tag_ids, tag_distances = tags_info
-        for distance in tag_distances:
-            tests.log('distance',`distance`)
+        tag_contours, warped_tags, warped_orientations_tags, tag_ids, tag_distances, rotations = tags_info
+        if newresults and len(tag_contours)>0:
+            message = 'distances: ' + `tag_distances` # + '\n'
+            message += '\trotations: ' + `rotations` # + '\n'
+            message += '\tids: ' + `tag_ids`
+            message += '\tdtime: ' + `tag_detector.perf_time`# + '\n'
+            tests.log(message,"")
         if TESTING:
             TESTING = False
-            tag_contours, warped_tags, warped_orientations_tags, tag_ids, tag_distances = tags_info
+            tag_contours, warped_tags, warped_orientations_tags, tag_ids, tag_distances, rotations = tags_info
             rgb_image = np.zeros((tag_detector.prec_frame.shape[0],tag_detector.prec_frame.shape[1],3),dtype=np.uint8)
             rgb_image[:,:,0] = tag_detector.prec_frame
             rgb_image[:,:,1] = rgb_image[:,:,0]
             rgb_image[:,:,2] = rgb_image[:,:,0]
             rgb_image = image_utils.draw_contours(rgb_image,tag_contours)
             image_utils.show_image(rgb_image)
+            #image_utils.show_image(tag_detector.diff_frame)
             for warped_tag in warped_tags:
                 image_utils.show_image(warped_tag)
     image_processor.shutdown()
