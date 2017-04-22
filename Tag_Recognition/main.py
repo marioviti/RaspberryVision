@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 
 from Image_Processor import Image_Processor
+from Tag_Detector import Tag_detection_experiment
 import settings
 import tag_recognition
 import image_utils
@@ -32,74 +33,45 @@ def count_frames(image):
     print framecount
     return image
 
-class Tag_Detector():
-    def __init__(self,tag_settings):
-        self.tag_settings = tag_settings
-        self.prec_frame = None
-        self.diff_frame = None
-        self.count = 0
-        self.tag_results = None
-        self.perf_time = None
-
-    def get_tags_info(self,image):
-        if self.diff_frame is None:
-            self.prec_frame = image
-            self.perf_time = time.time()
-            self.tag_results = tag_recognition.detect_tags(image,self.tag_settings[settings.AREA_RATIO_KEY])
-            self.perf_time = time.time() - self.perf_time
-            #tests.log('time',`self.perf_time`)
-        elif self.count == 0:
-            self.diff_frame = image - self.prec_frame
-            self.prec_frame = image
-            self.count = 1
-        elif self.count == 1:
-            self.count = 0
-            self.prec_frame = image
-            self.perf_time = time.time()
-            self.tag_results = tag_recognition.detect_tags(image,
-                self.tag_settings[settings.AREA_RATIO_KEY],
-                D=self.tag_settings[settings.DIAGONAL_KEY])
-            self.perf_time = time.time() - self.perf_time
-        return self.tag_results
-
 if __name__ == '__main__':
     """
     This program is designed to recognize Tags.
     """
-    tag_detector = Tag_Detector(settings.tags_settings[settings.DOUBLE_SQUARE_TYPE])
+    tag_detection_experiment = Tag_detection_experiment()
+    tag_detection_experiment.setup()
 
     global RUNNING
     RUNNING = True
     signal.signal(signal.SIGINT, signal_handler_stop_running) #CTRL C
     signal.signal(signal.SIGTSTP, signal_handler_test) #CTRL Z
-    image_processor = Image_Processor()
-    image_processor.set_preprocessing_function(image_utils.convert_grey)
-    image_processor.set_post_processing_function(tag_detector.get_tags_info)
-    image_processor.start()
+
+    tag_detection_experiment.start()
     print "hallowing camera to warm up"
     time.sleep(2)
     print "let's start!!!"
     tags_info = None
     while(RUNNING):
-        newresults, tags_info = image_processor.retrieve_post_results()
-        tag_contours, warped_tags, warped_orientations_tags, tag_ids, tag_distances, rotations = tags_info
-        if newresults and len(tag_contours)>0:
-            message = 'distances: ' + `tag_distances` # + '\n'
-            message += '\trotations: ' + `rotations` # + '\n'
-            message += '\tids: ' + `tag_ids`
-            message += '\tdtime: ' + `tag_detector.perf_time`# + '\n'
+        time_d = time.time()
+        newresults, tags_info = tag_detection_experiment.retrieve_post_results()
+        tags_contours,tags_aligned,tags_ids,tags_distances,tags_rotations = tags_info
+        if newresults and len(tags_contours)>0:
+            message = 'distances: ' + `tags_distances` #+ '\n'
+            message+= '\trotations: ' + `tags_rotations` # + '\n'
+            message+= '\tids: ' + `tags_ids`
+            message+= '\tdtime: ' + `tag_detection_experiment.tag_detector.perf_time`# + '\n'
+            message+= '\tdtime_all: ' + `time_d-time.time()`# + '\n'
             tests.log(message,"")
         if TESTING:
             TESTING = False
-            tag_contours, warped_tags, warped_orientations_tags, tag_ids, tag_distances, rotations = tags_info
-            rgb_image = np.zeros((tag_detector.prec_frame.shape[0],tag_detector.prec_frame.shape[1],3),dtype=np.uint8)
-            rgb_image[:,:,0] = tag_detector.prec_frame
+            tags_contours,tags_aligned,tags_ids,tags_distances,tags_rotations = tags_info
+            rgb_image = np.zeros((tag_detection_experiment.tag_detector.prec_frame.shape[0],tag_detection_experiment.tag_detector.prec_frame.shape[1],3),dtype=np.uint8)
+            rgb_image[:,:,0] = tag_detection_experiment.tag_detector.prec_frame
             rgb_image[:,:,1] = rgb_image[:,:,0]
             rgb_image[:,:,2] = rgb_image[:,:,0]
-            rgb_image = image_utils.draw_contours(rgb_image,tag_contours)
+            rgb_image = image_utils.draw_contours(rgb_image,tags_contours)
             image_utils.show_image(rgb_image)
-            #image_utils.show_image(tag_detector.diff_frame)
-            for warped_tag in warped_tags:
-                image_utils.show_image(warped_tag)
-    image_processor.shutdown()
+            #image_utils.show_image(tag_detection_experiment.tag_detector.diff_frame)
+            for tag_aligned in tags_aligned:
+                image_utils.show_image(tag_aligned)
+    tag_detection_experiment.shutdown()
     print "good bye"

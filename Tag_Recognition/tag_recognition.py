@@ -3,55 +3,78 @@ import numpy as np
 from numpy import linalg as lnag
 import image_utils
 
+
 #################################################################################
 #                      TAG DETECION FOR RASPBERRY v.1.0                         #
 #################################################################################
-#                                                                               #
-#       This is a collection of function used to detect identify and estimate   #
-#       metrics from a tag.                                                     #
-#       The tag is desribed in the settings file.                               #
-#                                                                               #
+
+info = "This is a collection of functions used to detect, identify and estimate metrics\n"
+info +="the tag description is in the settings.py file"
+
+def __info__():
+    return info
+
 #################################################################################
 
 TAG_ID_ERROR = 99999
 
-def rad_to_deg(alpha):
-    return alpha*(180./np.pi)
+def rad_to_deg(angle):
+    # angle*(180/pi)
+    return np.rad2deg(angle)
+
+def deg_to_rad(angle):
+    # angle*(pi/180)
+    return np.deg2rad(angle)
 
 def estimate_rotation(rect):
+    """
+        rect type must be np.zeros((4, 2), dtype = np.float32)
+        follow this order for input
+        (tl, tr, br, bl) = rect
+    """
     (tl, tr, br, bl) = rect
-    y_l = np.sqrt(np.dot((tl-bl),(tl-bl).T))
-    y_r = np.sqrt(np.dot((tr-br),(tr-br).T))
-    x = np.sqrt(np.dot((bl-br),(bl-br).T))
-    y = np.sqrt(np.dot((tl-bl),(tl-bl).T))
+    l_side = np.sqrt(np.dot((tl-bl),(tl-bl).T))
+    r_side = np.sqrt(np.dot((tr-br),(tr-br).T))
+    b_side = np.sqrt(np.dot((bl-br),(bl-br).T))
+    up_side = np.sqrt(np.dot((tl-bl),(tl-bl).T))
     sign = 1
-    if y_l > y_r:
-        sign = -1
-    return sign*rad_to_deg( np.arctan((y/x)) )
+    if l_side > r_side:
+        return -rad_to_deg( np.arctan(np.sqrt(l_side/b_side)) )
+    return rad_to_deg( np.arctan(np.sqrt(r_side/b_side)) )
 
-def estimate_distance(cnt,t_a=1,image_h=1080,v_fov=48.5):
+def estimate_distance(rect,actual_side_size=2,frame_h=1080,v_aov=41.,eps=10e-3):
     """
+        rect type must be np.zeros((4, 2), dtype = np.float32)
+        follow this order for input
+        (tl, tr, br, bl) = rect
         t_a: the actual tag diagonal
-        v_fov: for RASPBERRY camera
-        image_h: video port height
-    """
-    centre, radius = min_circle(cnt) # the approximation of the object projection
-    t_p = 2*radius
-    alpha = (v_fov/image_h)*t_p
-    return t_a/float(alpha)
+        v_aov: angle of view for RASPBERRY camera
+        frame_h: video port height
 
-#@profile
-def identify_tag(tag_image):
+        default vales referece to the pi camera module v.1:
+        http://elinux.org/Rpi_Camera_Module#Technical_Parameters_.28v.2_board.29
     """
-        tag are 3x2 array,
-        sample the center
+    (tl, tr, br, bl) = rect
+    l_side = np.sqrt(np.dot((tl-bl),(tl-bl).T))
+    r_side = np.sqrt(np.dot((tr-br),(tr-br).T))
+    appearent_side_size = np.max([l_side,r_side])
+    projected_angle = (v_aov/frame_h)*(appearent_side_size+eps)
+    # tag values are in cm
+    # plus approximating the arc with a segment leads to different values
+    # after taking measures the problem is resolved "empirically"
+    rect_coeff = 0.141785
+    return actual_side_size/float(projected_angle)*rect_coeff
+
+def identify_tag(tag_image,tiles_x=3,tiles_y=3):
+    """
+        tag are 3x4 array, last row is parity bit,
     """
     y,x = tag_image.shape
-    dx,dy = x/3,y/4
+    dx,dy = x/(tiles_x+1),y/(tiles_y+2)
     dtau = 3
     id_tag = 0
-    for i in range(2):
-        for j in range(3):
+    for i in xrange(tiles_x):
+        for j in xrange(tiles_y):
             crdx, crdy = (1+i)*dx,(1+j)*dy
             sample = np.sum(tag_image[crdy-dtau:crdy+dtau,crdx-dtau:crdx+dtau])/(16.*255.)
             tag_image[crdy-dtau:crdy+dtau,crdx-dtau:crdx+dtau] = 127
@@ -81,24 +104,9 @@ def threshold_tag(tag_image):
 # using kernprof -v -l for profiling
 # @profile
 # Total time: 0.00845 s on Pi3
-def deskew(image,cnt,auto_size=False,maxWidth=100,maxHeight=100,bleed=5,bottom_off=75):
+def rectify_tag(image,rect,auto_size=False,maxWidth=100,maxHeight=100,bleed=5,bottom_off=75):
     """
-        Square tags.
     """
-    pts = cnt.reshape(4, 2)
-    rect = np.zeros((4, 2), dtype = np.float32)
-    s = pts.sum(axis = 1)
-    rect[0] = pts[np.argmin(s)]
-    rect[2] = pts[np.argmax(s)]
-    diff = np.diff(pts, axis = 1)
-    rect[1] = pts[np.argmin(diff)]
-    rect[3] = pts[np.argmax(diff)]
-
-    # the order now is
-    # (tl, tr, br, bl) = rect
-
-    # construct our destination points which will be used to
-    # map the screen to a top-down, "birds eye" view
     dst = np.array([
     	[0, 0],
     	[maxWidth - 1, 0],
@@ -109,43 +117,44 @@ def deskew(image,cnt,auto_size=False,maxWidth=100,maxHeight=100,bleed=5,bottom_o
     # calculate the perspective transform matrix and warp
     M = cv2.getPerspectiveTransform(rect, dst)
     # attention opencv returns inveresd h and w!!!
-    warp = cv2.warpPerspective(image, M, (maxWidth, bottom_off+maxHeight))      # 85.7
-    warp_tag = warp[bleed:maxHeight-bleed,bleed:maxWidth-bleed]
-    orient_tag = warp[maxHeight+bleed*3:,:]
-    return warp_tag, orient_tag
+    #warp = cv2.warpPerspective(image, M, (maxWidth, bottom_off+maxHeight))      # 85.7
+    # separate_ the tag body from the tag orientation section
+    #warp_tag = warp[bleed:maxHeight-bleed,bleed:maxWidth-bleed]
+    #orient_tag = warp[maxHeight+bleed*3:,:]
+    #return warp_tag, orient_tag
+    warp = cv2.warpPerspective(image, M, (maxWidth,maxHeight))
+    return warp[bleed:maxHeight-bleed,bleed:maxWidth-bleed]
 
 # using kernprof -v -l for profiling
 # @profile
-# Total time: 0.220422 s
-def detect_tags(gray_image, ar, t_a=2, sigma=0.3):
-    tag_contours, edged = detect_tag_contours(gray_image, ar, sigma=sigma)      # 93.0
-    warped_tags = []
-    warped_orientations_tags = []
-    tag_ids = []
-    tag_distances = []
-    for tag_contour in tag_contours:
-        tag_distances += [ estimate_distance(tag_contour,t_a=t_a) ]
-        warper_tag, warped_orientations_tag = deskew(gray_image,tag_contour)    # 5.0
-        warped_orientations_tags += [ warped_orientations_tag ]
-        warped_tags += [ warper_tag ]
-    warped_tags = map(threshold_tag,warped_tags)
-    warped_orientations_tags = map(threshold_tag,warped_orientations_tags)
-    rotations = map(estimate_rotation,tag_contours)
-    tag_ids = map(identify_tag,warped_tags)
-    return tag_contours, warped_tags, warped_orientations_tags, tag_ids, tag_distances, rotations
+def detect_tags(gray_image, ar, actual_side_size=2, sigma=0.3):
+    edge_image = detect_tag_contours(gray_image, sigma=sigma)
+    tags_contours = find_tags_contours(edge_image,ar)
+
+    tags_aligned, tags_ids, tags_distances, tags_rotations = [],[],[],[]
+    for tag_contour in tags_contours:
+        tag_rect = cnt2rect(tag_contour)
+        tag_aligned = rectify_tag(gray_image,tag_rect)
+        tag_aligned = threshold_tag(tag_aligned)
+        # append new values
+        tags_ids += [ identify_tag(tag_aligned) ]
+        tags_distances += [ estimate_distance(tag_rect, actual_side_size=actual_side_size) ]
+        tags_rotations += [ estimate_rotation(tag_rect) ]
+        tags_aligned += [ tag_aligned ]
+    return tags_contours,tags_aligned,tags_ids,tags_distances,tags_rotations
 
 # using kernprof -v -l for profiling
 # @profile
-# Total time: 0.150379 s
-def detect_tag_contours(gray_image, ar, sigma=0.3):
+def detect_tag_contours(gray_image, sigma=0.3):
     # compute the median of the single channel pixel intensities
-    v = np.median(gray_image)                                                   # 23.3
-	# apply automatic Canny edge detection using the computed mean
+    y,x = gray_image.shape
+    l_image = gray_image[100:y-100,100:x/2-100]
+    r_image = gray_image[100:y-100,x/2-100:x-100]
+    v = (np.mean(l_image) + np.mean(r_image))/2.
     lower = int(max(0, (1.0 - sigma) * v))
     upper = int(min(255, (1.0 + sigma) * v))
-    edged = cv2.Canny(gray_image, lower, upper)                                 # 20.0
-    tag_contours = find_tag_contours(edged,ar)                                  # 56.6
-    return tag_contours, edged
+    edge_image = cv2.Canny(gray_image, lower, upper)
+    return edge_image
 
 def is_tag_cnt(cnt_p, cnt_c, ar, sigma, eps):
     area_1 = cv2.contourArea(cnt_p)
@@ -157,8 +166,7 @@ def is_tag_cnt(cnt_p, cnt_c, ar, sigma, eps):
 
 # using kernprof -v -l for profiling
 # @profile
-# Total time: 0.114152 s on Pi3
-def find_tag_contours(edge_image, ar, sigma=0.3, eps=20, approx=cv2.CHAIN_APPROX_NONE):
+def find_tags_contours(edge_image, ar, sigma=0.3, eps=20, approx=cv2.CHAIN_APPROX_NONE):
     """
         CHAIN_APPROX_NONE fast result and better response for skewed tags.
 
@@ -204,6 +212,20 @@ def find_tag_contours(edge_image, ar, sigma=0.3, eps=20, approx=cv2.CHAIN_APPROX
                                         # save deepest contour
                                         tag_contours += [next_child_approxTop]
     return tag_contours
+
+
+def cnt2rect(cnt):
+    pts = cnt.reshape(4, 2)
+    rect = np.zeros((4, 2), dtype = np.float32)
+    s = pts.sum(axis = 1)
+    rect[0] = pts[np.argmin(s)]
+    rect[2] = pts[np.argmax(s)]
+    diff = np.diff(pts, axis = 1)
+    rect[1] = pts[np.argmin(diff)]
+    rect[3] = pts[np.argmax(diff)]
+    # the order now is
+    # (tl, tr, br, bl) = rect
+    return rect
 
 def approx_cnt(cnt):
     peri = cv2.arcLength(cnt, True)
@@ -328,8 +350,7 @@ def k_means(image,k=3):
 ##    ret, labels, centers = cv2.kmeans(points, k, term_crit, 10, 0)
 ##    return ret, labels, centers
 
-
-#show_image(edged)
+#show_image(edge_image)
 
 # use k means to adjust scene luminosity
 #resized = cv2.resize(gray_image,None,fx=0.125,fy=0.125,interpolation=cv2.INTER_LINEAR)

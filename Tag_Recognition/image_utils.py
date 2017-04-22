@@ -1,15 +1,20 @@
 import numpy as np
 import cv2
 
+name_window = 'video_window'
+window = cv2.namedWindow(name_window)
+
 def draw_contours(image,contours):
     cv2.drawContours(image, contours, -1, (0,255,0), 3)
     return image
 
-def show_image(image,window='image',last=True):
+def show_image(image,window='image',still=True,fps=25.):
     cv2.imshow(window,image)
-    cv2.waitKey(0)
-    if last:
+    if still:
+        cv2.waitKey(0) # wait untill key
         cv2.destroyAllWindows()
+    else:
+        cv2.waitKey(int((1/fps)*1000)) # in ms
 
 def read_image(path):
     """
