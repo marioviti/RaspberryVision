@@ -1,7 +1,7 @@
 
-from Tag_Recognition import tag_recognition
-from Tag_Recognition import settings
-from Tag_Recognition import image_utils
+from tag_recognition import tag_recognition
+from tag_recognition import settings
+from tag_recognition import image_utils
 
 import numpy as np
 import cv2

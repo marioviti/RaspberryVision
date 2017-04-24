@@ -1,5 +1,3 @@
-import time
-import signal
 import cv2
 import numpy as np
 
@@ -51,7 +49,6 @@ if __name__ == '__main__':
     print "let's start!!!"
     tags_info = None
     while(RUNNING):
-        time_d = time.time()
         newresults, tags_info = tag_detection_experiment.retrieve_post_results()
         tags_contours,tags_aligned,tags_ids,tags_distances,tags_rotations = tags_info
         if newresults and len(tags_contours)>0:
@@ -59,7 +56,6 @@ if __name__ == '__main__':
             message+= '\trotations: ' + `tags_rotations` # + '\n'
             message+= '\tids: ' + `tags_ids`
             message+= '\tdtime: ' + `tag_detection_experiment.tag_detector.perf_time`# + '\n'
-            message+= '\tdtime_all: ' + `time_d-time.time()`# + '\n'
             tests.log(message,"")
         if TESTING:
             TESTING = False
@@ -70,7 +66,6 @@ if __name__ == '__main__':
             rgb_image[:,:,2] = rgb_image[:,:,0]
             rgb_image = image_utils.draw_contours(rgb_image,tags_contours)
             image_utils.show_image(rgb_image)
-            #image_utils.show_image(tag_detection_experiment.tag_detector.diff_frame)
             for tag_aligned in tags_aligned:
                 image_utils.show_image(tag_aligned)
     tag_detection_experiment.shutdown()

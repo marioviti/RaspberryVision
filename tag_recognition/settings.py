@@ -10,14 +10,9 @@ DIAGONAL_KEY = 'diagonal'
 tags_settings = {
                     'double_square' : {
                         'area_ratio' : 1.44,
-                        'diagonal' : 7.5#cm
+                        'diagonal' : 7.5,#cm
+                        'bits' : 9
                     },
-                    'square' : {
-                        'area_ratio' : 2.205175
-                    },
-                    'triangle' : {
-                        'area_ratio' : 1.812898
-                    }
                 }
 
 camera_settings = {
