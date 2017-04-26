@@ -13,19 +13,14 @@ def test_tag_detection(path):
     image = image_utils.read_image(path)
     grey_image = image_utils.convert_grey(image)
     ar = settings.tags_settings[settings.DOUBLE_SQUARE_TYPE]['area_ratio']
-    tag_contours, warped_tags, warped_orientations_tags, tag_ids, tag_distances, rotations = tag_recognition.detect_tags(grey_image,ar)
+    tags_contours,tags_aligned,tags_ids,tags_distances,tags_rotations = tag_recognition.detect_tags(grey_image,ar)
     print 'ids: '
-    print tag_ids
-    print 'rotations:'
-    print rotations
-    print 'distances: '
-    print tag_distances
-    image = image_utils.draw_contours(image,tag_contours)
-    for warped_tag in warped_tags:
-        image_utils.show_image(warped_tag)
-    for warped_orientations_tag in warped_orientations_tags:
-        image_utils.show_image(warped_orientations_tag)
+    print tags_ids
+    image = image_utils.draw_contours(image,tags_contours)
     image_utils.show_image(image)
+    for tag_aligned in tags_aligned:
+        image_utils.show_image(tag_aligned)
+
 
 test_opz = { 'tag_detection': test_tag_detection, }
 if (len(sys.argv) == 1):

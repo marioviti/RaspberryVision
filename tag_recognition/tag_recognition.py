@@ -16,7 +16,7 @@ def __info__():
 
 #################################################################################
 
-TAG_ID_ERROR = 99999
+TAG_ID_ERROR = -1
 
 def rad_to_deg(angle):
     # angle*(180/pi)
@@ -47,7 +47,7 @@ def estimate_distance(rect,actual_side_size=2,frame_h=1080,v_aov=41.,eps=10e-3):
         rect type must be np.zeros((4, 2), dtype = np.float32)
         follow this order for input
         (tl, tr, br, bl) = rect
-        t_a: the actual tag diagonal
+        actual_side_size: actual_side_size of the tag
         v_aov: angle of view for RASPBERRY camera
         frame_h: video port height
 
@@ -65,18 +65,31 @@ def estimate_distance(rect,actual_side_size=2,frame_h=1080,v_aov=41.,eps=10e-3):
     rect_coeff = 0.141785
     return actual_side_size/float(projected_angle)*rect_coeff
 
-def identify_tag(tag_image,tiles_x=3,tiles_y=3):
+def identify_tag_id(tag_image,tiles_x=3,tiles_y=3):
     """
-        tag are 3x4 array, last row is parity bit,
+        Calculate the nine bit value of the identification tag.
+        The most significant bit is on the top left, the others follows as shown:
+
+         ------- ------- -------
+        | bit_9 | bit_8 | bit_7 |
+        |       |       |       |
+         ------- ------- -------
+        | bit_6 | bit_5 | bit_4 |
+        |       |       |       |
+         ------- ------- -------
+        | bit_3 | bit_2 | bit_1 |
+        |       |       |       |
+         ------- ------- -------
+
     """
     y,x = tag_image.shape
-    dx,dy = x/(tiles_x+1),y/(tiles_y+2)
-    dtau = 3
+    dx,dy = x/(tiles_x+1),y/(tiles_y+1)
+    dtau = 3 # witdth of the filter applied to sampling
     id_tag = 0
     for i in xrange(tiles_x):
         for j in xrange(tiles_y):
             crdx, crdy = (1+i)*dx,(1+j)*dy
-            sample = np.sum(tag_image[crdy-dtau:crdy+dtau,crdx-dtau:crdx+dtau])/(16.*255.)
+            sample = np.sum(tag_image[crdy-dtau:crdy+dtau,crdx-dtau:crdx+dtau])/((dtau**2)*255.)
             tag_image[crdy-dtau:crdy+dtau,crdx-dtau:crdx+dtau] = 127
             # thresholding the noise
             if sample > 0.75:
@@ -84,17 +97,64 @@ def identify_tag(tag_image,tiles_x=3,tiles_y=3):
             elif sample < 0.25:
                 bit = 0
             else:
-                #notag
                 return TAG_ID_ERROR
-            id_tag += bit *2**(i+j*2)
+            id_tag += bit *2**(i*tiles_x+j)
     return id_tag
+
+def identify_tag_orientation(tag_image,tiles_x=2,smpl_off=0.25):
+    """
+        Calculate the 2 bit value of the botton tag for orientation mapping.
+
+        tag_values:
+
+        00 -> 0 -> front ,
+        01 -> 1 -> left,
+        10 -> 2 -> right,
+        11 -> 3 -> back
+
+        tag:
+        -----------------
+        | bit_1 | bit_2 |
+        -----------------
+
+        bit_i:
+
+         .25        .5      .25
+        |    |             |    |
+        C'----------------------D'--.25
+        |    C-------------D    |---
+        |    | sample area |    |   .5
+        |    A-------------B    |---
+        A'----------------------B'--.25
+    """
+    y,x = tag_image.shape
+    dx = x/tiles_x
+    id_tag = 0
+    A_x = int(np.floor(dx*smpl_off))
+    A_y = int(np.floor(y*smpl_off))
+    sample_area = (dx-2*A_x)*(y-2*A_y)
+    id_tag = 0
+    for i in xrange(tiles_x):
+        sample = np.sum(tag_image[A_y:-A_y,(i*dx)+A_x:((i+1)*dx)-A_x] )/(sample_area*255.)
+        tag_image[A_y:-A_y,(i*dx)+A_x:((i+1)*dx)-A_x] = 127
+        if sample > 0.75:
+            bit = 1
+        elif sample < 0.25:
+            bit = 0
+        else:
+            return TAG_ID_ERROR
+        id_tag += bit *2**(i)
+    image_utils.show_image(tag_image)
+    return id_tag
+
 
 def threshold_tag(tag_image):
     """
-        once a tag image is found binarize the input.
-        as we model the tag signal as formant code composed
-        by a rect function and 2 amplitudes (min gray,max gray)
-        the optimal threshold maximizin the SNR is at the
+        This step is necessary to tag identification.
+
+        The tag is modeled as a 2D binary NRZ signal.
+        Binary simbols are in {min gray,max gray}
+        the optimal threshold maximizing the SNR is at the
         middle of the amplitudes.
     """
     thresh = (np.max(tag_image)+np.min(tag_image))/2.
@@ -104,8 +164,23 @@ def threshold_tag(tag_image):
 # using kernprof -v -l for profiling
 # @profile
 # Total time: 0.00845 s on Pi3
-def rectify_tag(image,rect,auto_size=False,maxWidth=100,maxHeight=100,bleed=5,bottom_off=75):
+def rectify_tag(image,rect,maxWidth=100,maxHeight=100,bleed=10,bottom_off=65):
     """
+        Finds and apply affine homogeneus transformation for image rectification.
+        bleed: cropping contour in pixel from each side.
+        bottom_off: offset from the identification tag to the botton tag.
+         _______________
+        | bleed         |
+        |  -----------  |
+        | |           | |
+        | |           | | identification tag
+        | |           | |
+        |  -----------  |
+         ---------------
+          bottom offset
+         ---------------
+        |               | orientation tag
+         ---------------
     """
     dst = np.array([
     	[0, 0],
@@ -117,13 +192,13 @@ def rectify_tag(image,rect,auto_size=False,maxWidth=100,maxHeight=100,bleed=5,bo
     # calculate the perspective transform matrix and warp
     M = cv2.getPerspectiveTransform(rect, dst)
     # attention opencv returns inveresd h and w!!!
-    #warp = cv2.warpPerspective(image, M, (maxWidth, bottom_off+maxHeight))      # 85.7
+    warp = cv2.warpPerspective(image, M, (maxWidth, bottom_off+maxHeight))      # 85.7
     # separate_ the tag body from the tag orientation section
-    #warp_tag = warp[bleed:maxHeight-bleed,bleed:maxWidth-bleed]
-    #orient_tag = warp[maxHeight+bleed*3:,:]
-    #return warp_tag, orient_tag
-    warp = cv2.warpPerspective(image, M, (maxWidth,maxHeight))
-    return warp[bleed:maxHeight-bleed,bleed:maxWidth-bleed]
+    warp_tag = warp[bleed:maxHeight-bleed,bleed:maxWidth-bleed]
+    orient_tag = warp[maxHeight+bottom_off/2:-bleed,:]
+    return warp_tag,orient_tag #, orient_tag
+    #warp = cv2.warpPerspective(image, M, (maxWidth,maxHeight))
+    #return warp[bleed:maxHeight-bleed,bleed:maxWidth-bleed]
 
 # using kernprof -v -l for profiling
 # @profile
@@ -131,16 +206,19 @@ def detect_tags(gray_image, ar, actual_side_size=2, sigma=0.3):
     edge_image = detect_tag_contours(gray_image, sigma=sigma)
     tags_contours = find_tags_contours(edge_image,ar)
 
-    tags_aligned, tags_ids, tags_distances, tags_rotations = [],[],[],[]
+    tags_aligned, tags_ids, orientation_tags_ids, tags_distances, tags_rotations = [],[],[],[],[]
     for tag_contour in tags_contours:
         tag_rect = cnt2rect(tag_contour)
-        tag_aligned = rectify_tag(gray_image,tag_rect)
+        tag_aligned,orientation_tag_aligned = rectify_tag(gray_image,tag_rect)
         tag_aligned = threshold_tag(tag_aligned)
+        orientation_tag_aligned = threshold_tag(orientation_tag_aligned)
+        orientation_tags_ids += [ identify_tag_orientation(orientation_tag_aligned) ]
         # append new values
-        tags_ids += [ identify_tag(tag_aligned) ]
+        tags_ids += [ identify_tag_id(tag_aligned) ]
         tags_distances += [ estimate_distance(tag_rect, actual_side_size=actual_side_size) ]
         tags_rotations += [ estimate_rotation(tag_rect) ]
         tags_aligned += [ tag_aligned ]
+    print orientation_tags_ids
     return tags_contours,tags_aligned,tags_ids,tags_distances,tags_rotations
 
 # using kernprof -v -l for profiling
