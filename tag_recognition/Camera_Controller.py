@@ -18,6 +18,9 @@ class Camera_Controller(threading.Thread):
         # initialize lock
         self.initialize_locks()
 
+    def killCam(self):
+		self.camera.close()
+
     def shutdown(self):
         self.running = False
 
@@ -63,3 +66,4 @@ class Camera_Controller(threading.Thread):
                 self.processing_buffer = frame.array.copy() # keep a copy
             self.image_buffer.seek(0)
             self.image_buffer.truncate()
+        self.killCam()

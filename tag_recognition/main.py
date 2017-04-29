@@ -2,12 +2,13 @@ import cv2
 import numpy as np
 
 from Image_Processor import Image_Processor
-from Tag_Detector import Tag_detection_experiment
+from Tag_Detector import Tag_Detector
 import settings
 import tag_recognition
 import image_utils
 import tests
 
+import signal
 import time
 
 RUNNING = True
@@ -35,8 +36,7 @@ if __name__ == '__main__':
     """
     This program is designed to recognize Tags.
     """
-    tag_detection_experiment = Tag_detection_experiment()
-    tag_detection_experiment.setup()
+    tag_detection_experiment = Tag_Detector()
 
     global RUNNING
     RUNNING = True
@@ -49,19 +49,19 @@ if __name__ == '__main__':
     print "let's start!!!"
     tags_info = None
     while(RUNNING):
-        newresults, tags_info = tag_detection_experiment.retrieve_post_results()
+        newresults, tags_info = tag_detection_experiment.get_tag_data()
         tags_contours,tags_aligned,tags_ids,tags_distances,tags_rotations = tags_info
         if newresults and len(tags_contours)>0:
             message = 'distances: ' + `tags_distances` #+ '\n'
             message+= '\trotations: ' + `tags_rotations` # + '\n'
             message+= '\tids: ' + `tags_ids`
-            message+= '\tdtime: ' + `tag_detection_experiment.tag_detector.perf_time`# + '\n'
+            message+= '\tdtime: ' + `tag_detection_experiment.perf_time`# + '\n'
             tests.log(message,"")
         if TESTING:
             TESTING = False
-            tags_contours,tags_aligned,tags_ids,tags_distances,tags_rotations = tags_info
-            rgb_image = np.zeros((tag_detection_experiment.tag_detector.prec_frame.shape[0],tag_detection_experiment.tag_detector.prec_frame.shape[1],3),dtype=np.uint8)
-            rgb_image[:,:,0] = tag_detection_experiment.tag_detector.prec_frame
+            ttags_contours,tags_aligned,tags_ids,tags_distances,tags_rotations = tags_info
+            rgb_image = np.zeros((tag_detection_experiment.prec_frame.shape[0],tag_detection_experiment.prec_frame.shape[1],3),dtype=np.uint8)
+            rgb_image[:,:,0] = tag_detection_experiment.prec_frame
             rgb_image[:,:,1] = rgb_image[:,:,0]
             rgb_image[:,:,2] = rgb_image[:,:,0]
             rgb_image = image_utils.draw_contours(rgb_image,tags_contours)

@@ -26,21 +26,14 @@ def deg_to_rad(angle):
     # angle*(pi/180)
     return np.deg2rad(angle)
 
-def estimate_rotation(rect):
+def estimate_rotation(contour):
     """
-        rect type must be np.zeros((4, 2), dtype = np.float32)
-        follow this order for input
-        (tl, tr, br, bl) = rect
+        estimate rotation using arctan
     """
-    (tl, tr, br, bl) = rect
-    l_side = np.sqrt(np.dot((tl-bl),(tl-bl).T))
-    r_side = np.sqrt(np.dot((tr-br),(tr-br).T))
-    b_side = np.sqrt(np.dot((bl-br),(bl-br).T))
-    up_side = np.sqrt(np.dot((tl-bl),(tl-bl).T))
-    sign = 1
-    if l_side > r_side:
-        return -l_side/float(b_side)#-rad_to_deg( np.arctan(np.sqrt(l_side/float(b_side))) )
-    return l_side/float(b_side)#rad_to_deg( np.arctan(np.sqrt(r_side/float(b_side))) )
+    # x,y coord of topleft corner
+    x,y,w,h = bounding_box(contour)
+    rotation_arg = np.abs(1 - (h/float(w)))*2
+    return rad_to_deg( np.arctan(rotation_arg) )
 
 def estimate_distance(rect,actual_side_size=2,frame_h=1080,v_aov=41.,eps=10e-3):
     """
@@ -53,6 +46,8 @@ def estimate_distance(rect,actual_side_size=2,frame_h=1080,v_aov=41.,eps=10e-3):
 
         default vales referece to the pi camera module v.1:
         http://elinux.org/Rpi_Camera_Module#Technical_Parameters_.28v.2_board.29
+
+        returned measures are in cm
     """
     (tl, tr, br, bl) = rect
     l_side = np.sqrt(np.dot((tl-bl),(tl-bl).T))
@@ -62,7 +57,7 @@ def estimate_distance(rect,actual_side_size=2,frame_h=1080,v_aov=41.,eps=10e-3):
     # tag values are in cm
     # plus approximating the arc with a segment leads to different values
     # after taking measures the problem is resolved "empirically"
-    rect_coeff = 0.141785
+    rect_coeff = 14.1785
     return actual_side_size/float(projected_angle)*rect_coeff
 
 def identify_tag_id(tag_image,tiles_x=3,tiles_y=3):
@@ -82,13 +77,20 @@ def identify_tag_id(tag_image,tiles_x=3,tiles_y=3):
          ------- ------- -------
 
     """
+    # normalize tag
+    min_val = np.min(tag_image)
+    tag_image = tag_image-min_val
+    max_val = np.max(tag_image)
+    tag_image = (tag_image/float(max_val))*255.
+    tag_image[tag_image>127] = 255
+    tag_image[tag_image<=127] = 0
     y,x = tag_image.shape
-    dx,dy = x/(tiles_x+1),y/(tiles_y+1)
-    dtau = 3 # witdth of the filter applied to sampling
+    dx,dy = x/(tiles_x*2),y/(tiles_y*2)
+    dtau = 2 # witdth of the filter applied to sampling
     id_tag = 0
     for i in xrange(tiles_x):
         for j in xrange(tiles_y):
-            crdx, crdy = (1+i)*dx,(1+j)*dy
+            crdx, crdy = (2*i)*dx + dx,(2*j)*dy + dy
             sample = np.sum(tag_image[crdy-dtau:crdy+dtau,crdx-dtau:crdx+dtau])/((dtau**2)*255.)
             tag_image[crdy-dtau:crdy+dtau,crdx-dtau:crdx+dtau] = 127
             # thresholding the noise
@@ -100,53 +102,6 @@ def identify_tag_id(tag_image,tiles_x=3,tiles_y=3):
                 return TAG_ID_ERROR
             id_tag += bit *2**(i*tiles_x+j)
     return id_tag
-
-def identify_tag_orientation(tag_image,tiles_x=2,smpl_off=0.25):
-    """
-        Calculate the 2 bit value of the botton tag for orientation mapping.
-
-        tag_values:
-
-        00 -> 0 -> front ,
-        01 -> 1 -> left,
-        10 -> 2 -> right,
-        11 -> 3 -> back
-
-        tag:
-        -----------------
-        | bit_1 | bit_2 |
-        -----------------
-
-        bit_i:
-
-         .25        .5      .25
-        |    |             |    |
-        C'----------------------D'--.25
-        |    C-------------D    |---
-        |    | sample area |    |   .5
-        |    A-------------B    |---
-        A'----------------------B'--.25
-    """
-    y,x = tag_image.shape
-    dx = x/tiles_x
-    id_tag = 0
-    A_x = int(np.floor(dx*smpl_off))
-    A_y = int(np.floor(y*smpl_off))
-    sample_area = (dx-2*A_x)*(y-2*A_y)
-    id_tag = 0
-    for i in xrange(tiles_x):
-        sample = np.sum(tag_image[A_y:-A_y,(i*dx)+A_x:((i+1)*dx)-A_x] )/(sample_area*255.)
-        tag_image[A_y:-A_y,(i*dx)+A_x:((i+1)*dx)-A_x] = 127
-        if sample > 0.75:
-            bit = 1
-        elif sample < 0.25:
-            bit = 0
-        else:
-            return TAG_ID_ERROR
-        id_tag += bit *2**(i)
-    image_utils.show_image(tag_image)
-    return id_tag
-
 
 def threshold_tag(tag_image):
     """
@@ -163,24 +118,19 @@ def threshold_tag(tag_image):
 
 # using kernprof -v -l for profiling
 # @profile
-# Total time: 0.00845 s on Pi3
-def rectify_tag(image,rect,maxWidth=100,maxHeight=100,bleed=10,bottom_off=65):
+def rectify_tag(image,rect,maxWidth=30,maxHeight=30,bleed=3):
     """
         Finds and apply affine homogeneus transformation for image rectification.
         bleed: cropping contour in pixel from each side.
         bottom_off: offset from the identification tag to the botton tag.
          _______________
-        | bleed         |
-        |  -----------  |
-        | |           | |
-        | |           | | identification tag
-        | |           | |
-        |  -----------  |
-         ---------------
-          bottom offset
-         ---------------
-        |               | orientation tag
-         ---------------
+        |     bleed     |
+        |   ---------   |
+        |  |         |  |
+        |  |         |  |  tag
+        |  |         |  |
+        |   ---------   |
+        |_______________|
     """
     dst = np.array([
     	[0, 0],
@@ -192,33 +142,24 @@ def rectify_tag(image,rect,maxWidth=100,maxHeight=100,bleed=10,bottom_off=65):
     # calculate the perspective transform matrix and warp
     M = cv2.getPerspectiveTransform(rect, dst)
     # attention opencv returns inveresd h and w!!!
-    warp = cv2.warpPerspective(image, M, (maxWidth, bottom_off+maxHeight))      # 85.7
-    # separate_ the tag body from the tag orientation section
+    warp = cv2.warpPerspective(image, M, (maxWidth,maxHeight))
     warp_tag = warp[bleed:maxHeight-bleed,bleed:maxWidth-bleed]
-    orient_tag = warp[maxHeight+bottom_off/2:-bleed,:]
-    return warp_tag,orient_tag #, orient_tag
-    #warp = cv2.warpPerspective(image, M, (maxWidth,maxHeight))
-    #return warp[bleed:maxHeight-bleed,bleed:maxWidth-bleed]
+    return warp_tag
 
 # using kernprof -v -l for profiling
 # @profile
 def detect_tags(gray_image, ar, actual_side_size=2, sigma=0.3):
     edge_image = detect_tag_contours(gray_image, sigma=sigma)
     tags_contours = find_tags_contours(edge_image,ar)
-
-    tags_aligned, tags_ids, orientation_tags_ids, tags_distances, tags_rotations = [],[],[],[],[]
+    tags_aligned, tags_ids, tags_distances, tags_rotations = [],[],[],[]
     for tag_contour in tags_contours:
         tag_rect = cnt2rect(tag_contour)
-        tag_aligned,orientation_tag_aligned = rectify_tag(gray_image,tag_rect)
-        tag_aligned = threshold_tag(tag_aligned)
-        orientation_tag_aligned = threshold_tag(orientation_tag_aligned)
-        orientation_tags_ids += [ identify_tag_orientation(orientation_tag_aligned) ]
+        tag_aligned = rectify_tag(gray_image,tag_rect)
         # append new values
         tags_ids += [ identify_tag_id(tag_aligned) ]
         tags_distances += [ estimate_distance(tag_rect, actual_side_size=actual_side_size) ]
-        tags_rotations += [ estimate_rotation(tag_rect) ]
+        tags_rotations += [ estimate_rotation(tag_contour) ]
         tags_aligned += [ tag_aligned ]
-    print orientation_tags_ids
     return tags_contours,tags_aligned,tags_ids,tags_distances,tags_rotations
 
 # using kernprof -v -l for profiling
@@ -226,8 +167,9 @@ def detect_tags(gray_image, ar, actual_side_size=2, sigma=0.3):
 def detect_tag_contours(gray_image, sigma=0.3):
     # compute the median of the single channel pixel intensities
     y,x = gray_image.shape
-    l_image = gray_image[100:y-100,100:x/2-100]
-    r_image = gray_image[100:y-100,x/2-100:x-100]
+
+    l_image = gray_image[y/3:y-(y/3),(x/3):x/2-((x/3))]
+    r_image = gray_image[y/3:y-(y/3),x/2-(x/3):x-(x/3)]
     v = (np.mean(l_image) + np.mean(r_image))/2.
     lower = int(max(0, (1.0 - sigma) * v))
     upper = int(min(255, (1.0 + sigma) * v))
@@ -268,27 +210,28 @@ def find_tags_contours(edge_image, ar, sigma=0.3, eps=20, approx=cv2.CHAIN_APPRO
             # this saves up a lot of computation.
             child = hierarchy[curr][2]
             if child!=-1 and child<N-1:
-                child_approxTop = approx_cnt(contours[child])
-                if len(child_approxTop) == 4 and is_tag_cnt(contours[curr],contours[child],ar,sigma,eps):
-                    next_curr = child+1
-                    next_curr_approxTop = approx_cnt(contours[next_curr])
-                    if len(next_curr_approxTop) == 4:
-                        next_child = hierarchy[next_curr][2]
-                        if next_child!=-1 and next_child<N-1:
-                            next_child_approxTop = approx_cnt(contours[next_child])
-                            if len(next_child_approxTop) == 4 and is_tag_cnt(contours[next_curr],contours[next_child],ar,sigma,eps):
-                                curr_approxTop = approx_cnt(contours[curr])
-                                if len(curr_approxTop) == 4:
-                                    if not occour[curr]:
-                                        occour[curr] = True
-                                    if not occour[child]:
-                                        occour[child] = True
-                                    if not occour[next_curr]:
-                                        occour[next_curr] = True
-                                    if not occour[next_child]:
-                                        occour[next_child] = True
-                                        # save deepest contour
-                                        tag_contours += [next_child_approxTop]
+                if is_tag_cnt(contours[curr],contours[child],ar,sigma,eps):
+                    child_approxTop = approx_cnt(contours[child])
+                    if len(child_approxTop) == 4:
+                        next_curr = child+1
+                        next_curr_approxTop = approx_cnt(contours[next_curr])
+                        if len(next_curr_approxTop) == 4:
+                            next_child = hierarchy[next_curr][2]
+                            if next_child!=-1 and next_child<N-1:
+                                next_child_approxTop = approx_cnt(contours[next_child])
+                                if len(next_child_approxTop) == 4 and is_tag_cnt(next_curr_approxTop,next_child_approxTop,ar,sigma,eps):
+                                    curr_approxTop = approx_cnt(contours[curr])
+                                    if len(curr_approxTop) == 4:
+                                        if not occour[curr]:
+                                            occour[curr] = True
+                                        if not occour[child]:
+                                            occour[child] = True
+                                        if not occour[next_curr]:
+                                            occour[next_curr] = True
+                                        if not occour[next_child]:
+                                            occour[next_child] = True
+                                            # save deepest contour
+                                            tag_contours += [next_child_approxTop]
     return tag_contours
 
 
