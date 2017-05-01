@@ -26,12 +26,12 @@ def deg_to_rad(angle):
     # angle*(pi/180)
     return np.deg2rad(angle)
 
-def estimate_rotation(contour):
+def estimate_rotation(bounding_box):
     """
         estimate rotation using arctan
     """
     # x,y coord of topleft corner
-    x,y,w,h = bounding_box(contour)
+    x,y,w,h = bounding_box
     rotation_arg = np.abs(1 - (h/float(w)))*2
     return rad_to_deg( np.arctan(rotation_arg) )
 
@@ -86,7 +86,7 @@ def identify_tag_id(tag_image,tiles_x=3,tiles_y=3):
     tag_image[tag_image<=127] = 0
     y,x = tag_image.shape
     dx,dy = x/(tiles_x*2),y/(tiles_y*2)
-    dtau = 2 # witdth of the filter applied to sampling
+    dtau = dx/2 # witdth of the filter applied to sampling
     id_tag = 0
     for i in xrange(tiles_x):
         for j in xrange(tiles_y):
@@ -118,9 +118,12 @@ def threshold_tag(tag_image):
 
 # using kernprof -v -l for profiling
 # @profile
-def rectify_tag(image,rect,maxWidth=30,maxHeight=30,bleed=3):
+def rectify_perspective_transform(image,rect,maxWidth=30,maxHeight=30,bleed=3):
     """
-        Finds and apply affine homogeneus transformation for image rectification.
+        Finds and apply inverse perspective transformation for image rectification.
+
+        http://docs.opencv.org/2.4/modules/imgproc/doc/geometric_transformations.html?highlight=warpaffine#cv2.getAffineTransform
+
         bleed: cropping contour in pixel from each side.
         bottom_off: offset from the identification tag to the botton tag.
          _______________
@@ -131,6 +134,7 @@ def rectify_tag(image,rect,maxWidth=30,maxHeight=30,bleed=3):
         |  |         |  |
         |   ---------   |
         |_______________|
+
     """
     dst = np.array([
     	[0, 0],
@@ -149,25 +153,29 @@ def rectify_tag(image,rect,maxWidth=30,maxHeight=30,bleed=3):
 # using kernprof -v -l for profiling
 # @profile
 def detect_tags(gray_image, ar, actual_side_size=2, sigma=0.3):
-    edge_image = detect_tag_contours(gray_image, sigma=sigma)
+    edge_image = edge_detection(gray_image, sigma=sigma)
     tags_contours = find_tags_contours(edge_image,ar)
-    tags_aligned, tags_ids, tags_distances, tags_rotations = [],[],[],[]
+    tags_ids, tags_distances, \
+    tags_rotations, tags_bounding_boxes = [],[],[],[]
     for tag_contour in tags_contours:
         tag_rect = cnt2rect(tag_contour)
-        tag_aligned = rectify_tag(gray_image,tag_rect)
+        tag_aligned = rectify_perspective_transform(gray_image,tag_rect)
         # append new values
         tags_ids += [ identify_tag_id(tag_aligned) ]
         tags_distances += [ estimate_distance(tag_rect, actual_side_size=actual_side_size) ]
-        tags_rotations += [ estimate_rotation(tag_contour) ]
-        tags_aligned += [ tag_aligned ]
-    return tags_contours,tags_aligned,tags_ids,tags_distances,tags_rotations
+        tag_bounding_box = bounding_box(tag_contour)
+        tags_rotations += [ estimate_rotation(tag_bounding_box) ]
+        tags_bounding_boxes += tag_bounding_box
+    return tags_contours,tags_ids,tags_distances,tags_rotations, tags_bounding_boxes
 
 # using kernprof -v -l for profiling
 # @profile
-def detect_tag_contours(gray_image, sigma=0.3):
-    # compute the median of the single channel pixel intensities
+def edge_detection(gray_image, sigma=0.3):
+    """
+        Use Canny edge detction algorythm
+    """
+    # compute the mean of image
     y,x = gray_image.shape
-
     l_image = gray_image[y/3:y-(y/3),(x/3):x/2-((x/3))]
     r_image = gray_image[y/3:y-(y/3),x/2-(x/3):x-(x/3)]
     v = (np.mean(l_image) + np.mean(r_image))/2.
@@ -186,7 +194,7 @@ def is_tag_cnt(cnt_p, cnt_c, ar, sigma, eps):
 
 # using kernprof -v -l for profiling
 # @profile
-def find_tags_contours(edge_image, ar, sigma=0.3, eps=20, approx=cv2.CHAIN_APPROX_NONE):
+def find_tags_contours(edge_image, ar, sigma=0.3, eps=20):
     """
         CHAIN_APPROX_NONE fast result and better response for skewed tags.
 
@@ -195,7 +203,7 @@ def find_tags_contours(edge_image, ar, sigma=0.3, eps=20, approx=cv2.CHAIN_APPRO
             -sigma is the variance of the area_ratio.
             -eps is the minimum area in pixels for a contour to be considered.
     """
-    contours, hierarchy = cv2.findContours(edge_image,cv2.RETR_TREE,approx)     # 27.6
+    contours, hierarchy = image_utils.findContours(edge_image,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
     if hierarchy is None:
         return contours
     tag_contours = []
@@ -214,24 +222,25 @@ def find_tags_contours(edge_image, ar, sigma=0.3, eps=20, approx=cv2.CHAIN_APPRO
                     child_approxTop = approx_cnt(contours[child])
                     if len(child_approxTop) == 4:
                         next_curr = child+1
-                        next_curr_approxTop = approx_cnt(contours[next_curr])
-                        if len(next_curr_approxTop) == 4:
-                            next_child = hierarchy[next_curr][2]
-                            if next_child!=-1 and next_child<N-1:
-                                next_child_approxTop = approx_cnt(contours[next_child])
-                                if len(next_child_approxTop) == 4 and is_tag_cnt(next_curr_approxTop,next_child_approxTop,ar,sigma,eps):
-                                    curr_approxTop = approx_cnt(contours[curr])
-                                    if len(curr_approxTop) == 4:
-                                        if not occour[curr]:
-                                            occour[curr] = True
-                                        if not occour[child]:
-                                            occour[child] = True
-                                        if not occour[next_curr]:
-                                            occour[next_curr] = True
-                                        if not occour[next_child]:
-                                            occour[next_child] = True
-                                            # save deepest contour
-                                            tag_contours += [next_child_approxTop]
+                        next_child = hierarchy[next_curr][2]
+                        if next_child!=-1 and next_child<N-1:
+                            next_curr_approxTop = approx_cnt(contours[next_curr])
+                            if len(next_curr_approxTop) == 4:
+                                if is_tag_cnt(next_curr_approxTop,contours[next_child],ar,sigma,eps):
+                                    next_child_approxTop = approx_cnt(contours[next_child])
+                                    if len(next_child_approxTop) == 4:
+                                        curr_approxTop = approx_cnt(contours[curr])
+                                        if len(curr_approxTop) == 4:
+                                            if not occour[curr]:
+                                                occour[curr] = True
+                                            if not occour[child]:
+                                                occour[child] = True
+                                            if not occour[next_curr]:
+                                                occour[next_curr] = True
+                                            if not occour[next_child]:
+                                                occour[next_child] = True
+                                                # save deepest contour
+                                                tag_contours += [next_child_approxTop]
     return tag_contours
 
 
