@@ -23,7 +23,7 @@ lk_params = dict(
             maxLevel = 4, # LK hypothese is true at lowest level
             criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
-def estimate_next_positions(prec_frame,curr_frame,prec_contours):
+def estimate_next_positions(prec_frame,curr_frame,prec_contours,actual_side_size=2):
     prec_points = np.float32(prec_contours).reshape(-1,1,2)
     global lk_params
     next_points, status, err = cv2.calcOpticalFlowPyrLK(prec_frame,curr_frame,prec_points)
