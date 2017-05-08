@@ -32,6 +32,7 @@ class Camera_Controller(threading.Thread):
         self.awb = camera_settings['awb']
         self.awb_gains = camera_settings['awb_gains']
         self.resolution = camera_settings['resolution']
+        self.frame_resize_resolution = camera_settings['frame_resize_resolution']
         self.framerate = camera_settings['framerate']
         self.frame_format = camera_settings['frame']['format']
         self.use_video_port = camera_settings['frame']['use_video_port']
@@ -45,20 +46,21 @@ class Camera_Controller(threading.Thread):
             self.camera.awb_mode = "off"
             self.camera.awb_gains = self.awb_gains
         if not self.aexposure:
-            # default on
+            self.camera.shutter_speed = self.camera.exposure_speed
             self.camera.exposure_mode = "off"
         self.camera.resolution = self.resolution
         self.camera.framerate = self.framerate
 
     def initialize_image_buffer(self):
-        self.image_buffer = PiRGBArray(self.camera)
+        self.image_buffer = PiRGBArray(self.camera,size=self.frame_resize_resolution)
         self.processing_buffer = None
 
     def run(self):
         # setting flag for gracious termination
         self.running = True
         for frame in self.camera.capture_continuous(self.image_buffer, \
-            format=self.frame_format , use_video_port=self.use_video_port):
+            format=self.frame_format , use_video_port=self.use_video_port,\
+            resize=self.frame_resize_resolution):
             if not self.running:
                 break
             with self.processing_buffer_lock:

@@ -1,3 +1,0 @@
-/home/mario/git/RaspberryVision/c_extension/opencv_com/CMakeFiles/rebuild_cache.dir
-/home/mario/git/RaspberryVision/c_extension/opencv_com/CMakeFiles/edit_cache.dir
-/home/mario/git/RaspberryVision/c_extension/opencv_com/CMakeFiles/display_image.dir
