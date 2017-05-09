@@ -6,7 +6,8 @@ import numpy as np
 http://pythonhosted.org/svgwrite/overview.html
 """
 
-num_tag = 2
+import sys
+num_tag = int(sys.argv[1])
 
 def bit_matrix(num,bits):
     assert num < 2**bits
@@ -49,7 +50,7 @@ num_bits = 9
 area_ratio = 1.4
 level_side = 7.5
 lt = 0
-drawObj = svgwrite.Drawing('username.svg', profile='tiny')#, width=`level_side`+'cm', height=`level_side`+'cm')
+drawObj = svgwrite.Drawing('tag_'+`num_tag`+'.svg', profile='tiny')#, width=`level_side`+'cm', height=`level_side`+'cm')
 drawObj.add(drawObj.rect(insert=(lt*cm,lt*cm), size=(level_side*cm, level_side*cm), fill="black"))
 for i in range(4):
     fill = "black" if i%2 == 1 else "white"
